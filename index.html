@@ -869,10 +869,16 @@ function resolveTeam(seed, standings, user, adminOverrides){
     const gk = groups[0];
     const st = standings[gk];
     if(!st) return 'TBD';
+    // Only resolve if user has picked all 3 matches in this group
+    // (if actual results exist for all 3, those count too)
+    const groupMatchIds = GROUP_MATCHES.filter(m=>m.group===gk).map(m=>m.id);
+    const playerObj = ALL_PLAYERS.find(p=>p.realName===user||p.id===user)||ME||{};
+    const gp = playerObj.groupPicks||{};
+    const allPicked = groupMatchIds.every(id => ST.results[id]!==undefined || gp[id]);
+    if(!allPicked) return 'TBD';
     // check tiebreak overrides
     const tieKey = `tie_${gk}_${rank}`;
     if(adminOverrides[tieKey]) return adminOverrides[tieKey];
-    // auto-resolve if no tie
     const team = st[rank-1];
     return team ? team.team : 'TBD';
   }
@@ -1449,11 +1455,13 @@ const ALL_TEAMS = Object.values(GROUPS).flatMap(g=>g.teams).sort();
 const TOP_SCORERS = [
   'Kylian Mbappé','Erling Haaland','Vinicius Jr.','Lionel Messi','Cristiano Ronaldo',
   'Harry Kane','Lautaro Martínez','Antoine Griezmann','Bukayo Saka','Phil Foden',
-  'Pedri','Rodri','Gavi','Federico Valverde','Jude Bellingham',
+  'Pedri','Gavi','Federico Valverde','Jude Bellingham','Lamine Yamal',
   'Marcus Rashford','Leroy Sané','Jamal Musiala','Rafael Leão','Bernardo Silva',
   'Romelu Lukaku','Robert Lewandowski','Memphis Depay','Cody Gakpo','Wout Weghorst',
-  'Mohammed Salah','Sadio Mané','Achraf Hakimi','Youssef En-Nesyri','Karim Adeyemi',
+  'Mohammed Salah','Sadio Mané','Achraf Hakimi','Youssef En-Nesyri','Dani Olmo',
   'Darwin Núñez','Luis Díaz','Richarlison','Gabriel Martinelli','Dusan Vlahovic',
+  'Alvaro Morata','Niclas Füllkrug','Jonathan David','Ollie Watkins','Cole Palmer',
+  'Nico Williams','Ferran Torres','Antoine Semenyo','Evan Ferguson','Rasmus Højlund',
 ].sort();
 
 function renderBonus(){
