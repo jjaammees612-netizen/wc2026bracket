@@ -718,26 +718,27 @@ async function submitIdentity(){
   const btn = document.querySelector('#modal-screen-2 .mbtn');
   btn.textContent='Saving...'; btn.disabled=true;
 
-  const {data:insertData, error} = await sb.from('wc2026_players').insert({real_name:realName,team_name:teamName});
-  if(error){
-    const msg = 'Error: '+(error.message||JSON.stringify(error));
+  const {error:insertError} = await sb.from('wc2026_players').insert({real_name:realName,team_name:teamName});
+  if(insertError){
+    const msg = 'Error: '+(insertError.message||JSON.stringify(insertError));
     errEl.textContent=msg;errEl.style.display='block';
     showToast('⚠️ '+msg);
-    console.error('Supabase insert error:', error);
+    console.error('Supabase insert error:', insertError);
     btn.textContent='Save & Enter Bracket →';btn.disabled=false;
     return;
   }
-  // Get the newly created player back
-  const newPlayer = Array.isArray(insertData) ? insertData[0] : insertData;
-  if(!newPlayer || !newPlayer.id){
-    errEl.textContent='Save failed — no player returned. Try again.';errEl.style.display='block';
+  // Fetch the player back by name
+  await loadAllPlayers();
+  const newPlayer = ALL_PLAYERS.find(p=>p.realName.toLowerCase()===realName.toLowerCase());
+  if(!newPlayer){
+    errEl.textContent='Save failed — could not find player after insert. Try again.';errEl.style.display='block';
     btn.textContent='Save & Enter Bracket →';btn.disabled=false;
     return;
   }
   // Create empty picks row
   await sb.from('wc2026_picks').insert({player_id:newPlayer.id,group_picks:{},ko_picks:{},bonus_picks:{}});
 
-  ME = {id:newPlayer.id, realName:newPlayer.real_name, teamName:newPlayer.team_name, groupPicks:{}, koPicks:{}, bonusPicks:{}};
+  ME = {id:newPlayer.id, realName:newPlayer.realName, teamName:newPlayer.teamName, groupPicks:{}, koPicks:{}, bonusPicks:{}};
   ALL_PLAYERS.push({...ME});
   saveSession(data.id);
   updateHeaderName();
