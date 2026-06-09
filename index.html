@@ -640,15 +640,24 @@ async function loadAllPlayers(){
 
 async function saveMyPicks(){
   if(!ME) return;
-  // Upsert picks row
-  const {error} = await sb.from('wc2026_picks').upsert({
+  const payload = {
     player_id: ME.id,
     group_picks: ME.groupPicks,
     ko_picks: ME.koPicks,
     bonus_picks: ME.bonusPicks,
     updated_at: new Date().toISOString(),
-  }, {onConflict:'player_id'});
-  if(error) { console.error('saveMyPicks error', error); showToast('⚠️ Save failed — check connection'); }
+  };
+  // Try update first (picks row already exists), then insert if not
+  const existing = await sbFetch('wc2026_picks', {eq:{player_id:ME.id}});
+  let error;
+  if(existing && existing.length > 0){
+    const res = await sb.from('wc2026_picks').upsert(payload, {onConflict:'player_id'});
+    error = res.error;
+  } else {
+    const res = await sb.from('wc2026_picks').insert(payload);
+    error = res.error;
+  }
+  if(error){ console.error('saveMyPicks error', error); showToast('⚠️ Save failed'); return; }
   // Update local ALL_PLAYERS
   const idx = ALL_PLAYERS.findIndex(p=>p.id===ME.id);
   if(idx>=0) ALL_PLAYERS[idx]={...ALL_PLAYERS[idx],...ME};
@@ -886,9 +895,10 @@ function resolveTeam(seed, standings, user, adminOverrides){
   // userRanking is ordered list of group keys [A,B,C,...] — top 8 qualify
   const playerObj2 = ALL_PLAYERS.find(p=>p.realName===user||p.id===user)||ME||{};
   const userRanking = (playerObj2.bonusPicks||{}).thirdRanking || [];
+  // If user hasn't explicitly set their 3rd place ranking, return TBD
+  if(userRanking.length === 0) return 'TBD';
   const qualifiedGroups = new Set(userRanking.slice(0,8));
 
-  // Filter candidate groups to those the user thinks qualify AND are in the allowed set for this slot
   const candidateGroups = groups.filter(gk => qualifiedGroups.has(gk));
   if(candidateGroups.length === 0) return 'TBD';
 
@@ -1558,7 +1568,7 @@ function renderThirdRankList(){
   if(!el) return;
   const locked = isLocked();
   if(!ME.bonusPicks) ME.bonusPicks={};
-  let ranking = ME.bonusPicks.thirdRanking || Object.keys(GROUPS);
+  let ranking = ME.bonusPicks.thirdRanking || [];
   // Make sure all 12 groups are present
   const allGroups = Object.keys(GROUPS);
   allGroups.forEach(g=>{ if(!ranking.includes(g)) ranking.push(g); });
