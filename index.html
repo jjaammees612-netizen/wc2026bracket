@@ -522,21 +522,21 @@ const GROUP_MATCHES = [
 // ====================================================
 const R32_SEEDS = [
   {id:'R32-73', label:'M73 · Jun 28', seedT1:'2A', seedT2:'2B'},
-  {id:'R32-76', label:'M76 · Jun 29', seedT1:'1C', seedT2:'2F'},
   {id:'R32-74', label:'M74 · Jun 29', seedT1:'1E', seedT2:'3ABCDF'},
   {id:'R32-75', label:'M75 · Jun 29', seedT1:'1F', seedT2:'2C'},
-  {id:'R32-78', label:'M78 · Jun 30', seedT1:'2E', seedT2:'2I'},
+  {id:'R32-76', label:'M76 · Jun 29', seedT1:'1C', seedT2:'2F'},
   {id:'R32-77', label:'M77 · Jun 30', seedT1:'1I', seedT2:'3CDFGH'},
+  {id:'R32-78', label:'M78 · Jun 30', seedT1:'2E', seedT2:'2I'},
   {id:'R32-79', label:'M79 · Jun 30', seedT1:'1A', seedT2:'3CEFHI'},
   {id:'R32-80', label:'M80 · Jul 1',  seedT1:'1L', seedT2:'3EHIJK'},
-  {id:'R32-82', label:'M82 · Jul 1',  seedT1:'1G', seedT2:'3AEHIJ'},
   {id:'R32-81', label:'M81 · Jul 1',  seedT1:'1D', seedT2:'3BEFIJ'},
-  {id:'R32-84', label:'M84 · Jul 2',  seedT1:'1H', seedT2:'2J'},
+  {id:'R32-82', label:'M82 · Jul 1',  seedT1:'1G', seedT2:'3AEHIJ'},
   {id:'R32-83', label:'M83 · Jul 2',  seedT1:'2K', seedT2:'2L'},
+  {id:'R32-84', label:'M84 · Jul 2',  seedT1:'1H', seedT2:'2J'},
   {id:'R32-85', label:'M85 · Jul 2',  seedT1:'1B', seedT2:'3EFGIJ'},
-  {id:'R32-88', label:'M88 · Jul 3',  seedT1:'2D', seedT2:'2G'},
   {id:'R32-86', label:'M86 · Jul 3',  seedT1:'1J', seedT2:'2H'},
   {id:'R32-87', label:'M87 · Jul 3',  seedT1:'1K', seedT2:'3DEIJL'},
+  {id:'R32-88', label:'M88 · Jul 3',  seedT1:'2D', seedT2:'2G'},
 ];
 
 // R16 bracket paths (winner of R32 matchup X plays winner of Y)
@@ -927,53 +927,52 @@ function resolveKOTeams(user){
     };
   });
 
-  // Step 2: helper — given a match, who advances?
-  // Priority: actual result winner > user's KO pick > neither (TBD)
-  // Returns the team name of the winner, using teams[] to translate
+  // Step 2: helper — returns winner only if actually picked/resulted, else null
   function advancer(matchId){
     const actual = res[matchId];
-    if(actual !== undefined) return actual.winner; // actual result set (null = shouldn't happen in KO)
-    return kp[matchId] || null; // user's pick, or null if not picked yet
+    if(actual !== undefined) return actual.winner;
+    return kp[matchId] || null; // null = not picked yet → propagates as TBD
   }
 
-  // Step 3: R16 — winner of each R32 pair
+  // Step 3: R16 — only populate if R32 winner is known
   KNOCKOUT_MATCHES.filter(m=>m.round==='R16').forEach(m=>{
     const w1 = advancer(m.r32a);
     const w2 = advancer(m.r32b);
     teams[m.id] = {
-      t1: w1 || (teams[m.r32a] ? teams[m.r32a].t1 : 'TBD'),
-      t2: w2 || (teams[m.r32b] ? teams[m.r32b].t1 : 'TBD'),
+      t1: w1 || 'TBD',
+      t2: w2 || 'TBD',
     };
   });
 
-  // Step 4: QF — winner of each R16 pair
+  // Step 4: QF — only populate if R16 winner is known
   KNOCKOUT_MATCHES.filter(m=>m.round==='QF').forEach(m=>{
     const w1 = advancer(m.r16a);
     const w2 = advancer(m.r16b);
     teams[m.id] = {
-      t1: w1 || (teams[m.r16a] ? teams[m.r16a].t1 : 'TBD'),
-      t2: w2 || (teams[m.r16b] ? teams[m.r16b].t1 : 'TBD'),
+      t1: w1 || 'TBD',
+      t2: w2 || 'TBD',
     };
   });
 
-  // Step 5: SF — winner of each QF pair
+  // Step 5: SF — only populate if QF winner is known
   KNOCKOUT_MATCHES.filter(m=>m.round==='SF').forEach(m=>{
     const w1 = advancer(m.qfa);
     const w2 = advancer(m.qfb);
     teams[m.id] = {
-      t1: w1 || (teams[m.qfa] ? teams[m.qfa].t1 : 'TBD'),
-      t2: w2 || (teams[m.qfb] ? teams[m.qfb].t1 : 'TBD'),
+      t1: w1 || 'TBD',
+      t2: w2 || 'TBD',
     };
   });
 
-  // Step 6: 3rd place + Final from SF winners/losers
+  // Step 6: 3rd place + Final — only if SF winners known
+  const sf1w = advancer('SF-1');
+  const sf2w = advancer('SF-2');
   const sf1 = teams['SF-1']||{t1:'TBD',t2:'TBD'};
   const sf2 = teams['SF-2']||{t1:'TBD',t2:'TBD'};
-  const sf1w = advancer('SF-1'); const sf2w = advancer('SF-2');
   const sf1l = sf1w ? (sf1w===sf1.t1 ? sf1.t2 : sf1.t1) : 'TBD';
   const sf2l = sf2w ? (sf2w===sf2.t1 ? sf2.t2 : sf2.t1) : 'TBD';
-  teams['3RD']   = { t1: sf1l||'TBD', t2: sf2l||'TBD' };
-  teams['FINAL'] = { t1: sf1w||sf1.t1||'TBD', t2: sf2w||sf2.t1||'TBD' };
+  teams['3RD']   = { t1: sf1l, t2: sf2l };
+  teams['FINAL'] = { t1: sf1w||'TBD', t2: sf2w||'TBD' };
 
   return teams;
 }
