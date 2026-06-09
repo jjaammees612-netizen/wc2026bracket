@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WC 2026 Bracket Battle</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
 <style>
 :root {
   --green:#00C853; --gold:#FFD700; --red:#E53935; --blue:#2196F3;
@@ -179,23 +180,127 @@ header{border-bottom:1px solid var(--border);padding:16px 24px;display:flex;alig
   .pprogress{grid-template-columns:repeat(2,1fr);}
 }
 </style>
+<script>
+// Minimal Supabase REST client — no CDN needed
+const supabase = {
+  createClient(url, key){
+    const h = {
+      'apikey': key,
+      'Authorization': 'Bearer '+key,
+      'Content-Type': 'application/json',
+    };
+    async function doFetch(path, opts={}){
+      const r = await fetch(url+'/rest/v1/'+path, {...opts, headers:{...h,...(opts.headers||{})}});
+      const text = await r.text();
+      let data = null;
+      try{ data = JSON.parse(text); }catch(e){ data = text; }
+      if(!r.ok) return {data:null, error:{message: typeof data==='object'?(data.message||data.hint||JSON.stringify(data)):data, status:r.status}};
+      return {data, error:null};
+    }
+    function builder(table){
+      const state = {table, filters:[], cols:'*', isSingle:false};
+      const obj = {
+        select(cols='*'){ state.cols=cols; return obj; },
+        eq(col,val){ state.filters.push(`${col}=eq.${encodeURIComponent(val)}`); return obj; },
+        single(){ state.isSingle=true; return obj; },
+        // Make awaitable — triggers GET
+        then(resolve, reject){
+          let qs = `${table}?select=${state.cols}`;
+          if(state.filters.length) qs += '&'+state.filters.join('&');
+          return doFetch(qs).then(res=>{
+            if(res.error) return resolve(res);
+            const d = state.isSingle ? (Array.isArray(res.data)?res.data[0]:res.data)||null : res.data;
+            resolve({data:d, error:null});
+          }).catch(reject);
+        },
+        async insert(obj2){
+          const body = Array.isArray(obj2)?obj2:[obj2];
+          return doFetch(table, {method:'POST', headers:{'Prefer':'return=representation'}, body:JSON.stringify(body)});
+        },
+        async upsert(obj2, opts={}){
+          const conflict = opts.onConflict||'id';
+          const body = Array.isArray(obj2)?obj2:[obj2];
+          return doFetch(`${table}?on_conflict=${conflict}`, {
+            method:'POST',
+            headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
+            body:JSON.stringify(body)
+          });
+        },
+        async delete(){
+          let qs = table+'?';
+          if(state.filters.length) qs += state.filters.join('&');
+          else qs += 'id=neq.null'; // safety — don't delete everything
+          return doFetch(qs, {method:'DELETE', headers:{'Prefer':'return=representation'}});
+        }
+      };
+      return obj;
+    }
+    return { from: (table)=>builder(table) };
+  }
+};
+</script>
 </head>
 <body>
 
 <!-- MODAL -->
 <div id="modal">
   <div class="mbox">
-    <div class="mflag">⚽</div>
-    <div class="mtitle">WC 2026 Bracket Battle</div>
-    <div class="msub">48 teams · 104 matches · one winner</div>
-    <div class="buyin">💵 $10 Buy-In Per Person</div>
-    <div class="prizes">
-      <div class="pcard"><div class="pplace">🥇 1st</div><div class="pamount">$50</div><div class="plabel">Winner</div></div>
-      <div class="pcard"><div class="pplace">🥈 2nd</div><div class="pamount">$30</div><div class="plabel">Runner-up</div></div>
-      <div class="pcard"><div class="pplace">🥉 3rd</div><div class="pamount">$20</div><div class="plabel">Third Place</div></div>
+    <!-- SCREEN 1: Welcome -->
+    <div id="modal-screen-1">
+      <div class="mflag">⚽</div>
+      <div class="mtitle">WC 2026 Bracket Battle</div>
+      <div class="msub">48 teams · 104 matches · one winner</div>
+      <div class="buyin">💵 $10 Buy-In · 10 Players</div>
+      <div class="prizes">
+        <div class="pcard"><div class="pplace">🥇 1st</div><div class="pamount">$50</div><div class="plabel">Winner</div></div>
+        <div class="pcard"><div class="pplace">🥈 2nd</div><div class="pamount">$30</div><div class="plabel">Runner-up</div></div>
+        <div class="pcard"><div class="pplace">🥉 3rd</div><div class="pamount">$20</div><div class="plabel">Third Place</div></div>
+      </div>
+      <div class="disc">⚠️ For informational purposes only. A friendly competition among friends. No money is collected through this site.</div>
+      <button class="mbtn" onclick="showModalScreen(2)">Let's Go →</button>
     </div>
-    <div class="disc">⚠️ For informational purposes only. A friendly competition among friends. No money is collected through this site. Coordinate payments separately.</div>
-    <button class="mbtn" onclick="closeModal()">Enter the Tournament →</button>
+
+    <!-- SCREEN 2: Identity -->
+    <div id="modal-screen-2" style="display:none">
+      <div class="mflag">👤</div>
+      <div class="mtitle">Who Are You?</div>
+      <div class="msub">Enter your details to save your bracket</div>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;text-align:left">
+        <div>
+          <label style="font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">Your Real Name</label>
+          <input id="input-realname" type="text" placeholder="e.g. Pranay" maxlength="30"
+            style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:15px;">
+        </div>
+        <div>
+          <label style="font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">Your Team Name <span style="color:var(--muted);font-weight:400;text-transform:none">(fun alias for the leaderboard)</span></label>
+          <input id="input-teamname" type="text" placeholder="e.g. Messi's Accountant" maxlength="30"
+            style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:15px;">
+        </div>
+      </div>
+      <div id="modal-error" style="color:var(--red);font-size:12px;margin-bottom:12px;display:none"></div>
+      <button class="mbtn" onclick="submitIdentity()">Save & Enter Bracket →</button>
+      <div style="margin-top:14px">
+        <span style="font-size:12px;color:var(--muted)">Returning? </span>
+        <button onclick="showModalScreen(3)" style="background:none;border:none;color:var(--green);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;text-decoration:underline">Restore my bracket</button>
+      </div>
+    </div>
+
+    <!-- SCREEN 3: Restore -->
+    <div id="modal-screen-3" style="display:none">
+      <div class="mflag">🔑</div>
+      <div class="mtitle">Restore Bracket</div>
+      <div class="msub">Enter your real name to reload your picks</div>
+      <div style="margin-bottom:16px;text-align:left">
+        <label style="font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">Your Real Name</label>
+        <input id="input-restore" type="text" placeholder="e.g. Pranay" maxlength="30"
+          style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:15px;">
+      </div>
+      <div id="restore-error" style="color:var(--red);font-size:12px;margin-bottom:12px;display:none"></div>
+      <button class="mbtn" onclick="restoreByName()">Restore →</button>
+      <div style="margin-top:14px">
+        <button onclick="showModalScreen(2)" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">← Back</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -206,25 +311,9 @@ header{border-bottom:1px solid var(--border);padding:16px 24px;display:flex;alig
 <header>
   <div class="logo">⚽ WC2026 Bracket</div>
   <div class="hright">
-    <select class="namesel" id="namesel" onchange="handleNameSel(this.value)">
-      <option value="">👤 Who are you?</option>
-      <optgroup label="Your crew">
-        <option value="Player 1">Player 1</option>
-        <option value="Player 2">Player 2</option>
-        <option value="Player 3">Player 3</option>
-        <option value="Player 4">Player 4</option>
-        <option value="Player 5">Player 5</option>
-        <option value="Player 6">Player 6</option>
-        <option value="Player 7">Player 7</option>
-        <option value="Player 8">Player 8</option>
-        <option value="Player 9">Player 9</option>
-        <option value="Player 10">Player 10</option>
-      </optgroup>
-      <option value="__custom">✏️ Enter custom name...</option>
-    </select>
-    <div class="custom-name-wrap">
-      <input class="custom-name-input" id="custominput" type="text" placeholder="Your name" maxlength="20">
-      <button class="custom-name-btn" id="custombtn" onclick="setCustomName()">Save</button>
+    <div id="header-user" style="display:flex;align-items:center;gap:8px">
+      <div id="header-name" style="font-size:13px;color:var(--muted)">Not signed in</div>
+      <button onclick="switchPlayer()" style="background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;">Switch</button>
     </div>
   </div>
 </header>
@@ -233,6 +322,7 @@ header{border-bottom:1px solid var(--border);padding:16px 24px;display:flex;alig
 <div class="tabs">
   <div class="tab active" onclick="switchTab('groups')">📊 Groups</div>
   <div class="tab" onclick="switchTab('knockout')">🏆 Knockout</div>
+  <div class="tab" onclick="switchTab('bonus')">⭐ Bonus</div>
   <div class="tab" onclick="switchTab('mypicks')">🎯 My Picks</div>
   <div class="tab" onclick="switchTab('friends')">👥 Friends</div>
   <div class="tab" onclick="switchTab('leaderboard')">📈 Standings</div>
@@ -249,9 +339,14 @@ header{border-bottom:1px solid var(--border);padding:16px 24px;display:flex;alig
   <!-- KNOCKOUT TAB -->
   <div class="view" id="view-knockout">
     <div class="ko-info">
-      🔮 The knockout bracket is auto-generated from everyone's group stage predictions. After picks lock on <strong>June 11</strong>, the top 2 from each group + 8 best 3rd-place teams advance to the Round of 32. Enter actual results each day below.
+      🔮 Your bracket auto-populates from your group picks — predicted standings determine who you think advances. Pick winners each round. The 8 third-place slots (marked TBD) get assigned by admin after group stage ends Jun 27 — one quick update, then it runs itself.
     </div>
     <div id="knockout-content"></div>
+  </div>
+
+  <!-- BONUS PICKS -->
+  <div class="view" id="view-bonus">
+    <div id="bonus-content"></div>
   </div>
 
   <!-- MY PICKS -->
@@ -270,8 +365,8 @@ header{border-bottom:1px solid var(--border);padding:16px 24px;display:flex;alig
     <div class="lbtable">
       <div class="lbrow lbhead">
         <div>#</div><div>Player</div>
+        <div class="lbstat">Pts</div>
         <div class="lbstat">Correct</div>
-        <div class="lbstat">Picks</div>
         <div class="lbstat">Judged</div>
         <div class="lbstat">%</div>
       </div>
@@ -408,105 +503,186 @@ const GROUP_MATCHES = [
   {id:'L6',group:'L',t1:'Panama',t2:'England',date:'Jun 27'},
 ];
 
-// Knockout: R32 (32 matches), R16 (16), QF (8), SF (4), Final (1), 3rd (1) = 64 total
-const KNOCKOUT_MATCHES = [
-  // Round of 32
-  {id:'R32-1',round:'R32',label:'R32 M1',t1:'TBD',t2:'TBD'},
-  {id:'R32-2',round:'R32',label:'R32 M2',t1:'TBD',t2:'TBD'},
-  {id:'R32-3',round:'R32',label:'R32 M3',t1:'TBD',t2:'TBD'},
-  {id:'R32-4',round:'R32',label:'R32 M4',t1:'TBD',t2:'TBD'},
-  {id:'R32-5',round:'R32',label:'R32 M5',t1:'TBD',t2:'TBD'},
-  {id:'R32-6',round:'R32',label:'R32 M6',t1:'TBD',t2:'TBD'},
-  {id:'R32-7',round:'R32',label:'R32 M7',t1:'TBD',t2:'TBD'},
-  {id:'R32-8',round:'R32',label:'R32 M8',t1:'TBD',t2:'TBD'},
-  {id:'R32-9',round:'R32',label:'R32 M9',t1:'TBD',t2:'TBD'},
-  {id:'R32-10',round:'R32',label:'R32 M10',t1:'TBD',t2:'TBD'},
-  {id:'R32-11',round:'R32',label:'R32 M11',t1:'TBD',t2:'TBD'},
-  {id:'R32-12',round:'R32',label:'R32 M12',t1:'TBD',t2:'TBD'},
-  {id:'R32-13',round:'R32',label:'R32 M13',t1:'TBD',t2:'TBD'},
-  {id:'R32-14',round:'R32',label:'R32 M14',t1:'TBD',t2:'TBD'},
-  {id:'R32-15',round:'R32',label:'R32 M15',t1:'TBD',t2:'TBD'},
-  {id:'R32-16',round:'R32',label:'R32 M16',t1:'TBD',t2:'TBD'},
-  {id:'R32-17',round:'R32',label:'R32 M17',t1:'TBD',t2:'TBD'},
-  {id:'R32-18',round:'R32',label:'R32 M18',t1:'TBD',t2:'TBD'},
-  {id:'R32-19',round:'R32',label:'R32 M19',t1:'TBD',t2:'TBD'},
-  {id:'R32-20',round:'R32',label:'R32 M20',t1:'TBD',t2:'TBD'},
-  {id:'R32-21',round:'R32',label:'R32 M21',t1:'TBD',t2:'TBD'},
-  {id:'R32-22',round:'R32',label:'R32 M22',t1:'TBD',t2:'TBD'},
-  {id:'R32-23',round:'R32',label:'R32 M23',t1:'TBD',t2:'TBD'},
-  {id:'R32-24',round:'R32',label:'R32 M24',t1:'TBD',t2:'TBD'},
-  {id:'R32-25',round:'R32',label:'R32 M25',t1:'TBD',t2:'TBD'},
-  {id:'R32-26',round:'R32',label:'R32 M26',t1:'TBD',t2:'TBD'},
-  {id:'R32-27',round:'R32',label:'R32 M27',t1:'TBD',t2:'TBD'},
-  {id:'R32-28',round:'R32',label:'R32 M28',t1:'TBD',t2:'TBD'},
-  {id:'R32-29',round:'R32',label:'R32 M29',t1:'TBD',t2:'TBD'},
-  {id:'R32-30',round:'R32',label:'R32 M30',t1:'TBD',t2:'TBD'},
-  {id:'R32-31',round:'R32',label:'R32 M31',t1:'TBD',t2:'TBD'},
-  {id:'R32-32',round:'R32',label:'R32 M32',t1:'TBD',t2:'TBD'},
-  // Round of 16
-  {id:'R16-1',round:'R16',label:'R16 M1',t1:'TBD',t2:'TBD'},
-  {id:'R16-2',round:'R16',label:'R16 M2',t1:'TBD',t2:'TBD'},
-  {id:'R16-3',round:'R16',label:'R16 M3',t1:'TBD',t2:'TBD'},
-  {id:'R16-4',round:'R16',label:'R16 M4',t1:'TBD',t2:'TBD'},
-  {id:'R16-5',round:'R16',label:'R16 M5',t1:'TBD',t2:'TBD'},
-  {id:'R16-6',round:'R16',label:'R16 M6',t1:'TBD',t2:'TBD'},
-  {id:'R16-7',round:'R16',label:'R16 M7',t1:'TBD',t2:'TBD'},
-  {id:'R16-8',round:'R16',label:'R16 M8',t1:'TBD',t2:'TBD'},
-  {id:'R16-9',round:'R16',label:'R16 M9',t1:'TBD',t2:'TBD'},
-  {id:'R16-10',round:'R16',label:'R16 M10',t1:'TBD',t2:'TBD'},
-  {id:'R16-11',round:'R16',label:'R16 M11',t1:'TBD',t2:'TBD'},
-  {id:'R16-12',round:'R16',label:'R16 M12',t1:'TBD',t2:'TBD'},
-  {id:'R16-13',round:'R16',label:'R16 M13',t1:'TBD',t2:'TBD'},
-  {id:'R16-14',round:'R16',label:'R16 M14',t1:'TBD',t2:'TBD'},
-  {id:'R16-15',round:'R16',label:'R16 M15',t1:'TBD',t2:'TBD'},
-  {id:'R16-16',round:'R16',label:'R16 M16',t1:'TBD',t2:'TBD'},
-  // Quarter Finals
-  {id:'QF-1',round:'QF',label:'QF 1',t1:'TBD',t2:'TBD'},
-  {id:'QF-2',round:'QF',label:'QF 2',t1:'TBD',t2:'TBD'},
-  {id:'QF-3',round:'QF',label:'QF 3',t1:'TBD',t2:'TBD'},
-  {id:'QF-4',round:'QF',label:'QF 4',t1:'TBD',t2:'TBD'},
-  {id:'QF-5',round:'QF',label:'QF 5',t1:'TBD',t2:'TBD'},
-  {id:'QF-6',round:'QF',label:'QF 6',t1:'TBD',t2:'TBD'},
-  {id:'QF-7',round:'QF',label:'QF 7',t1:'TBD',t2:'TBD'},
-  {id:'QF-8',round:'QF',label:'QF 8',t1:'TBD',t2:'TBD'},
-  // Semi Finals
-  {id:'SF-1',round:'SF',label:'Semi Final 1',t1:'TBD',t2:'TBD'},
-  {id:'SF-2',round:'SF',label:'Semi Final 2',t1:'TBD',t2:'TBD'},
-  {id:'SF-3',round:'SF',label:'Semi Final 3',t1:'TBD',t2:'TBD'},
-  {id:'SF-4',round:'SF',label:'Semi Final 4',t1:'TBD',t2:'TBD'},
-  // Third place & Final
-  {id:'3RD',round:'3RD',label:'🥉 Third Place',t1:'TBD',t2:'TBD'},
-  {id:'FINAL',round:'FINAL',label:'🏆 THE FINAL — Jul 19',t1:'TBD',t2:'TBD'},
+// ====================================================
+// R32 SEEDING — confirmed FIFA bracket
+// Slots marked with seedT1/seedT2 define who plays who from group standings
+// '3RD' slots get assigned by admin after group stage (495 matrix combos)
+// ====================================================
+const R32_SEEDS = [
+  {id:'R32-73', label:'M73 · Jun 28', seedT1:'2A', seedT2:'2B'},
+  {id:'R32-76', label:'M76 · Jun 29', seedT1:'1C', seedT2:'2F'},
+  {id:'R32-74', label:'M74 · Jun 29', seedT1:'1E', seedT2:'3ABCDF'},
+  {id:'R32-75', label:'M75 · Jun 29', seedT1:'1F', seedT2:'2C'},
+  {id:'R32-78', label:'M78 · Jun 30', seedT1:'2E', seedT2:'2I'},
+  {id:'R32-77', label:'M77 · Jun 30', seedT1:'1I', seedT2:'3CDFGH'},
+  {id:'R32-79', label:'M79 · Jun 30', seedT1:'1A', seedT2:'3CEFHI'},
+  {id:'R32-80', label:'M80 · Jul 1',  seedT1:'1L', seedT2:'3EHIJK'},
+  {id:'R32-82', label:'M82 · Jul 1',  seedT1:'1G', seedT2:'3AEHIJ'},
+  {id:'R32-81', label:'M81 · Jul 1',  seedT1:'1D', seedT2:'3BEFIJ'},
+  {id:'R32-84', label:'M84 · Jul 2',  seedT1:'1H', seedT2:'2J'},
+  {id:'R32-83', label:'M83 · Jul 2',  seedT1:'2K', seedT2:'2L'},
+  {id:'R32-85', label:'M85 · Jul 2',  seedT1:'1B', seedT2:'3EFGIJ'},
+  {id:'R32-88', label:'M88 · Jul 3',  seedT1:'2D', seedT2:'2G'},
+  {id:'R32-86', label:'M86 · Jul 3',  seedT1:'1J', seedT2:'2H'},
+  {id:'R32-87', label:'M87 · Jul 3',  seedT1:'1K', seedT2:'3DEIJL'},
 ];
+
+// R16 bracket paths (winner of R32 matchup X plays winner of Y)
+const R16_PATHS = [
+  {id:'R16-1', label:'R16 M1 · Jul 5', r32a:'R32-73', r32b:'R32-76'},
+  {id:'R16-2', label:'R16 M2 · Jul 5', r32a:'R32-74', r32b:'R32-75'},
+  {id:'R16-3', label:'R16 M3 · Jul 6', r32a:'R32-78', r32b:'R32-77'},
+  {id:'R16-4', label:'R16 M4 · Jul 6', r32a:'R32-79', r32b:'R32-80'},
+  {id:'R16-5', label:'R16 M5 · Jul 7', r32a:'R32-82', r32b:'R32-81'},
+  {id:'R16-6', label:'R16 M6 · Jul 7', r32a:'R32-84', r32b:'R32-83'},
+  {id:'R16-7', label:'R16 M7 · Jul 8', r32a:'R32-85', r32b:'R32-88'},
+  {id:'R16-8', label:'R16 M8 · Jul 8', r32a:'R32-86', r32b:'R32-87'},
+];
+const QF_PATHS = [
+  {id:'QF-1', label:'QF 1 · Jul 11', r16a:'R16-1', r16b:'R16-2'},
+  {id:'QF-2', label:'QF 2 · Jul 11', r16a:'R16-3', r16b:'R16-4'},
+  {id:'QF-3', label:'QF 3 · Jul 12', r16a:'R16-5', r16b:'R16-6'},
+  {id:'QF-4', label:'QF 4 · Jul 12', r16a:'R16-7', r16b:'R16-8'},
+];
+const SF_PATHS = [
+  {id:'SF-1', label:'SF 1 · Jul 15', qfa:'QF-1', qfb:'QF-2'},
+  {id:'SF-2', label:'SF 2 · Jul 15', qfa:'QF-3', qfb:'QF-4'},
+];
+
+// Flat list still needed for result storage / rendering
+const KNOCKOUT_MATCHES = [
+  ...R32_SEEDS.map(s=>({id:s.id,round:'R32',label:s.label,t1:'TBD',t2:'TBD',seedT1:s.seedT1,seedT2:s.seedT2})),
+  ...R16_PATHS.map(p=>({id:p.id,round:'R16',label:p.label,t1:'TBD',t2:'TBD',r32a:p.r32a,r32b:p.r32b})),
+  ...QF_PATHS.map(p=>({id:p.id,round:'QF',label:p.label,t1:'TBD',t2:'TBD',r16a:p.r16a,r16b:p.r16b})),
+  ...SF_PATHS.map(p=>({id:p.id,round:'SF',label:p.label,t1:'TBD',t2:'TBD',qfa:p.qfa,qfb:p.qfb})),
+  {id:'3RD', round:'3RD', label:'🥉 3rd Place · Jul 18', t1:'TBD', t2:'TBD'},
+  {id:'FINAL', round:'FINAL', label:'🏆 THE FINAL · Jul 19', t1:'TBD', t2:'TBD'},
+];
+
+// ====================================================
+// SUPABASE
+// ====================================================
+const SUPA_URL = "https://skyenpwhqtxdaufvkwtg.supabase.co";
+const SUPA_KEY = "sb_publishable_fZHAlZb_nrx4nmkf277bgg_ptvranpS";
+let sb = null; // initialized in boot() after SDK loads
 
 // ====================================================
 // STATE
 // ====================================================
-const PLAYER_NAMES = ['Player 1','Player 2','Player 3','Player 4','Player 5',
-  'Player 6','Player 7','Player 8','Player 9','Player 10'];
+// ST holds local working copy — synced to/from Supabase
+let ST = {
+  results: {},        // matchId -> {winner}
+  actualChampion: null,
+  actualTopScorer: null,
+  adminOverrides: {},
+};
 
-function defaultState(){
-  return {
-    playerNames: [...PLAYER_NAMES], // editable names
-    groupPicks:{},   // user -> matchId -> 'w1'|'draw'|'w2'
-    koPicks:{},      // user -> matchId -> teamName (knockout winner picks)
-    results:{},      // matchId -> {winner, score1, score2}
-  };
-}
-
-function loadState(){
-  try{
-    const s = localStorage.getItem('wc2026_v3');
-    if(s) return Object.assign(defaultState(), JSON.parse(s));
-  }catch(e){}
-  return defaultState();
-}
-function saveState(){localStorage.setItem('wc2026_v3', JSON.stringify(ST));}
-
-let ST = loadState();
-let ME = '';
+// Current player session
+let ME = null; // {id, realName, teamName, groupPicks, koPicks, bonusPicks}
+let ALL_PLAYERS = []; // [{id, real_name, team_name, groupPicks, koPicks, bonusPicks}]
 let activeTab = 'groups';
 let activeFriend = null;
+
+// ====================================================
+// SUPABASE HELPERS
+// ====================================================
+async function sbFetch(table, options={}){
+  let q = sb.from(table).select(options.select||'*');
+  if(options.eq) Object.entries(options.eq).forEach(([k,v])=>q=q.eq(k,v));
+  if(options.single) q=q.single();
+  const {data,error} = await q;
+  if(error) console.error('sbFetch error', table, error);
+  return data||[];
+}
+
+async function loadResults(){
+  const rows = await sbFetch('wc2026_results');
+  ST.results = {};
+  (rows||[]).forEach(r=>{ ST.results[r.match_id]={winner:r.winner}; });
+}
+
+async function loadMeta(){
+  const rows = await sbFetch('wc2026_meta');
+  (rows||[]).forEach(r=>{
+    if(r.key==='actualChampion') ST.actualChampion=r.value;
+    if(r.key==='actualTopScorer') ST.actualTopScorer=r.value;
+  });
+}
+
+async function loadAllPlayers(){
+  const players = await sbFetch('wc2026_players');
+  const picks = await sbFetch('wc2026_picks');
+  ALL_PLAYERS = (players||[]).map(p=>{
+    const pk = (picks||[]).find(x=>x.player_id===p.id)||{};
+    return {
+      id: p.id,
+      realName: p.real_name,
+      teamName: p.team_name,
+      groupPicks: pk.group_picks||{},
+      koPicks: pk.ko_picks||{},
+      bonusPicks: pk.bonus_picks||{},
+    };
+  });
+}
+
+async function saveMyPicks(){
+  if(!ME) return;
+  // Upsert picks row
+  const {error} = await sb.from('wc2026_picks').upsert({
+    player_id: ME.id,
+    group_picks: ME.groupPicks,
+    ko_picks: ME.koPicks,
+    bonus_picks: ME.bonusPicks,
+    updated_at: new Date().toISOString(),
+  }, {onConflict:'player_id'});
+  if(error) { console.error('saveMyPicks error', error); showToast('⚠️ Save failed — check connection'); }
+  // Update local ALL_PLAYERS
+  const idx = ALL_PLAYERS.findIndex(p=>p.id===ME.id);
+  if(idx>=0) ALL_PLAYERS[idx]={...ALL_PLAYERS[idx],...ME};
+  else ALL_PLAYERS.push({...ME});
+}
+
+async function saveResult(matchId, winner){
+  const {error} = await sb.from('wc2026_results').upsert(
+    {match_id: matchId, winner, updated_at: new Date().toISOString()},
+    {onConflict:'match_id'}
+  );
+  if(error) console.error('saveResult error', error);
+  ST.results[matchId] = {winner};
+}
+
+async function saveMeta(key, value){
+  await sb.from('wc2026_meta').upsert({key,value},{onConflict:'key'});
+}
+
+// ====================================================
+// SESSION — localStorage just stores player id
+// ====================================================
+function saveSession(playerId){
+  localStorage.setItem('wc2026_player_id', playerId);
+}
+function loadSessionId(){
+  return localStorage.getItem('wc2026_player_id');
+}
+function clearSession(){
+  localStorage.removeItem('wc2026_player_id');
+  ME = null;
+}
+
+// ====================================================
+// PRIZE LOGIC
+// ====================================================
+function getPrizes(n){
+  if(n <= 0) return [];
+  const pool = n * 10;
+  if(n <= 5) return [{place:'🥇 1st', pct:.6},{place:'🥈 2nd', pct:.4}].map(p=>({...p,amt:Math.round(pool*p.pct)}));
+  if(n <= 7) return [{place:'🥇 1st', pct:.5},{place:'🥈 2nd', pct:.3},{place:'🥉 3rd', pct:.2}].map(p=>({...p,amt:Math.round(pool*p.pct)}));
+  if(n === 8) return [{place:'🥇 1st',amt:40},{place:'🥈 2nd',amt:25},{place:'🥉 3rd',amt:15}];
+  if(n <= 10) return [{place:'🥇 1st',amt:50},{place:'🥈 2nd',amt:30},{place:'🥉 3rd',amt:20}];
+  return [{place:'🥇 1st', pct:.5},{place:'🥈 2nd', pct:.3},{place:'🥉 3rd', pct:.2}].map(p=>({...p,amt:Math.round(pool*p.pct)}));
+}
+
+// renderModalPrizes removed — fixed prizes in modal HTML
 
 // ====================================================
 // LOCK CHECK
@@ -514,43 +690,103 @@ let activeFriend = null;
 function isLocked(){return new Date() >= LOCK_DATE;}
 
 // ====================================================
-// NAME MANAGEMENT
+// MODAL FLOW
 // ====================================================
-function handleNameSel(val){
-  if(val === '__custom'){
-    document.getElementById('custominput').style.display='inline-block';
-    document.getElementById('custombtn').style.display='inline-block';
-    document.getElementById('custominput').focus();
-    ME = '';
-  } else {
-    document.getElementById('custominput').style.display='none';
-    document.getElementById('custombtn').style.display='none';
-    ME = val;
-    renderAll();
+function showModalScreen(n){
+  [1,2,3].forEach(i=>{
+    const el = document.getElementById('modal-screen-'+i);
+    if(el) el.style.display = i===n?'block':'none';
+  });
+}
+
+async function submitIdentity(){
+  const realName = document.getElementById('input-realname').value.trim();
+  const teamName = document.getElementById('input-teamname').value.trim();
+  const errEl = document.getElementById('modal-error');
+  errEl.style.display='none';
+  if(!realName){errEl.textContent='Enter your real name.';errEl.style.display='block';return;}
+  if(!teamName){errEl.textContent='Enter a team name.';errEl.style.display='block';return;}
+
+  // Check if name already taken
+  const existing = ALL_PLAYERS.find(p=>p.realName.toLowerCase()===realName.toLowerCase());
+  if(existing){
+    errEl.textContent='That name is already taken. Use "Restore my bracket" to log back in.';
+    errEl.style.display='block';
+    return;
   }
-}
 
-function setCustomName(){
-  const inp = document.getElementById('custominput');
-  const name = inp.value.trim();
-  if(!name){showToast('Enter a name!');return;}
-  // Save as custom player — replace the selected slot or add
-  const sel = document.getElementById('namesel');
-  // Just use the custom name directly
-  ME = name;
-  inp.style.display='none';
-  document.getElementById('custombtn').style.display='none';
-  showToast('Welcome, '+name+'! 👋');
-  renderAll();
-}
+  const btn = document.querySelector('#modal-screen-2 .mbtn');
+  btn.textContent='Saving...'; btn.disabled=true;
 
-// ====================================================
-// CLOSE MODAL
-// ====================================================
-function closeModal(){
+  const {data:insertData, error} = await sb.from('wc2026_players').insert({real_name:realName,team_name:teamName});
+  if(error){
+    const msg = 'Error: '+(error.message||JSON.stringify(error));
+    errEl.textContent=msg;errEl.style.display='block';
+    showToast('⚠️ '+msg);
+    console.error('Supabase insert error:', error);
+    btn.textContent='Save & Enter Bracket →';btn.disabled=false;
+    return;
+  }
+  // Get the newly created player back
+  const newPlayer = Array.isArray(insertData) ? insertData[0] : insertData;
+  if(!newPlayer || !newPlayer.id){
+    errEl.textContent='Save failed — no player returned. Try again.';errEl.style.display='block';
+    btn.textContent='Save & Enter Bracket →';btn.disabled=false;
+    return;
+  }
+  // Create empty picks row
+  await sb.from('wc2026_picks').insert({player_id:newPlayer.id,group_picks:{},ko_picks:{},bonus_picks:{}});
+
+  ME = {id:newPlayer.id, realName:newPlayer.real_name, teamName:newPlayer.team_name, groupPicks:{}, koPicks:{}, bonusPicks:{}};
+  ALL_PLAYERS.push({...ME});
+  saveSession(data.id);
+  updateHeaderName();
   document.getElementById('modal').style.display='none';
   if(isLocked()) document.getElementById('lockbanner').style.display='block';
+  renderAll();
+  showToast('Welcome, '+realName+'! 🎉');
 }
+
+async function restoreByName(){
+  const name = document.getElementById('input-restore').value.trim();
+  const errEl = document.getElementById('restore-error');
+  errEl.style.display='none';
+  if(!name){errEl.textContent='Enter your name.';errEl.style.display='block';return;}
+
+  const match = ALL_PLAYERS.find(p=>p.realName.toLowerCase()===name.toLowerCase());
+  if(!match){
+    errEl.textContent='No player found with that name. Check spelling or join as new player.';
+    errEl.style.display='block';
+    return;
+  }
+  ME = {...match};
+  saveSession(match.id);
+  updateHeaderName();
+  document.getElementById('modal').style.display='none';
+  if(isLocked()) document.getElementById('lockbanner').style.display='block';
+  renderAll();
+  showToast('Welcome back, '+ME.realName+'! 👋');
+}
+
+function switchPlayer(){
+  clearSession();
+  ME = null;
+  updateHeaderName();
+  document.getElementById('modal').style.display='flex';
+  showModalScreen(2);
+}
+
+function updateHeaderName(){
+  const el = document.getElementById('header-name');
+  if(el) el.textContent = ME ? ME.teamName+' ('+ME.realName+')' : 'Not signed in';
+}
+
+// ====================================================
+// NAME MANAGEMENT
+// ====================================================
+// old name functions removed — replaced by Supabase identity flow
+
+// closeModal handled by submitIdentity/restoreByName
 
 // ====================================================
 // TAB SWITCHING
@@ -558,7 +794,7 @@ function closeModal(){
 function switchTab(tab){
   activeTab=tab;
   document.querySelectorAll('.tab').forEach((t,i)=>{
-    t.classList.toggle('active',['groups','knockout','mypicks','friends','leaderboard'][i]===tab);
+    t.classList.toggle('active',['groups','knockout','bonus','mypicks','friends','leaderboard'][i]===tab);
   });
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+tab).classList.add('active');
@@ -579,66 +815,244 @@ function computeStandings(user){
     gmatches.forEach(m=>{
       const result = ST.results[m.id];
       if(result){
-        // Use actual result
-        const {winner,score1,score2} = result;
-        const s1=parseInt(score1)||0, s2=parseInt(score2)||0;
-        table[m.t1].gf+=s1; table[m.t1].ga+=s2; table[m.t1].gd+=s1-s2;
-        table[m.t2].gf+=s2; table[m.t2].ga+=s1; table[m.t2].gd+=s2-s1;
+        const {winner} = result;
         if(winner===m.t1){table[m.t1].pts+=3;table[m.t1].w++;table[m.t2].l++;}
         else if(winner===m.t2){table[m.t2].pts+=3;table[m.t2].w++;table[m.t1].l++;}
         else{table[m.t1].pts+=1;table[m.t1].d++;table[m.t2].pts+=1;table[m.t2].d++;}
       } else if(user){
         // Use user's pick
-        const pick = (ST.groupPicks[user]||{})[m.id];
+        const player = ALL_PLAYERS.find(p=>p.realName===user||p.id===user)||{};
+        const pick = (player.groupPicks||{})[m.id];
         if(pick==='w1'){table[m.t1].pts+=3;table[m.t1].w++;table[m.t2].l++;}
         else if(pick==='w2'){table[m.t2].pts+=3;table[m.t2].w++;table[m.t1].l++;}
         else if(pick==='draw'){table[m.t1].pts+=1;table[m.t1].d++;table[m.t2].pts+=1;table[m.t2].d++;}
       }
     });
-    standings[gk] = Object.values(table).sort((a,b)=>b.pts-a.pts||b.gd-a.gd||b.gf-a.gf);
+    standings[gk] = Object.values(table).sort((a,b)=>b.pts-a.pts||b.w-a.w);
   }
   return standings;
+}
+
+// ====================================================
+// RESOLVE KO TEAMS from standings (for a given user's picks or actual results)
+// ====================================================
+function resolveTeam(seed, standings, user, adminOverrides){
+  // seed examples: '1A', '2B', '3ABCDF' (best 3rd from those groups)
+  if(!seed) return 'TBD';
+  const rank = parseInt(seed[0]);
+  const groups = seed.slice(1).split('');
+
+  if(rank === 1 || rank === 2){
+    const gk = groups[0];
+    const st = standings[gk];
+    if(!st) return 'TBD';
+    // check tiebreak overrides
+    const tieKey = `tie_${gk}_${rank}`;
+    if(adminOverrides[tieKey]) return adminOverrides[tieKey];
+    // auto-resolve if no tie
+    const team = st[rank-1];
+    return team ? team.team : 'TBD';
+  }
+  // 3rd place: use user's personal ranking to pick best from listed groups
+  // userRanking is ordered list of group keys [A,B,C,...] — top 8 qualify
+  const playerObj2 = ALL_PLAYERS.find(p=>p.realName===user||p.id===user)||ME||{};
+  const userRanking = (playerObj2.bonusPicks||{}).thirdRanking || [];
+  const qualifiedGroups = new Set(userRanking.slice(0,8));
+
+  // Filter candidate groups to those the user thinks qualify AND are in the allowed set for this slot
+  const candidateGroups = groups.filter(gk => qualifiedGroups.has(gk));
+  if(candidateGroups.length === 0) return 'TBD';
+
+  // Pick the highest-ranked one per user's ranking
+  candidateGroups.sort((a,b) => userRanking.indexOf(a) - userRanking.indexOf(b));
+  const bestGroup = candidateGroups[0];
+  const st = standings[bestGroup];
+  if(!st || !st[2]) return 'TBD';
+  return st[2].team;
+}
+
+function resolveKOTeams(user){
+  // Returns a map of matchId -> {t1, t2} fully resolved from group picks + KO picks
+  const standings = computeStandings(user);
+  const overrides = ST.adminOverrides||{};
+  const teams = {}; // matchId -> {t1, t2}
+  const playerObj = ALL_PLAYERS.find(p=>p.realName===user||p.id===user)||ME||{};
+  const kp = playerObj.koPicks||{};
+  const res = ST.results;
+
+  // Step 1: R32 — teams come from group standings
+  KNOCKOUT_MATCHES.filter(m=>m.round==='R32').forEach(m=>{
+    teams[m.id] = {
+      t1: resolveTeam(m.seedT1, standings, user, overrides),
+      t2: resolveTeam(m.seedT2, standings, user, overrides),
+    };
+  });
+
+  // Step 2: helper — given a match, who advances?
+  // Priority: actual result winner > user's KO pick > neither (TBD)
+  // Returns the team name of the winner, using teams[] to translate
+  function advancer(matchId){
+    const actual = res[matchId];
+    if(actual !== undefined) return actual.winner; // actual result set (null = shouldn't happen in KO)
+    return kp[matchId] || null; // user's pick, or null if not picked yet
+  }
+
+  // Step 3: R16 — winner of each R32 pair
+  KNOCKOUT_MATCHES.filter(m=>m.round==='R16').forEach(m=>{
+    const w1 = advancer(m.r32a);
+    const w2 = advancer(m.r32b);
+    teams[m.id] = {
+      t1: w1 || (teams[m.r32a] ? teams[m.r32a].t1 : 'TBD'),
+      t2: w2 || (teams[m.r32b] ? teams[m.r32b].t1 : 'TBD'),
+    };
+  });
+
+  // Step 4: QF — winner of each R16 pair
+  KNOCKOUT_MATCHES.filter(m=>m.round==='QF').forEach(m=>{
+    const w1 = advancer(m.r16a);
+    const w2 = advancer(m.r16b);
+    teams[m.id] = {
+      t1: w1 || (teams[m.r16a] ? teams[m.r16a].t1 : 'TBD'),
+      t2: w2 || (teams[m.r16b] ? teams[m.r16b].t1 : 'TBD'),
+    };
+  });
+
+  // Step 5: SF — winner of each QF pair
+  KNOCKOUT_MATCHES.filter(m=>m.round==='SF').forEach(m=>{
+    const w1 = advancer(m.qfa);
+    const w2 = advancer(m.qfb);
+    teams[m.id] = {
+      t1: w1 || (teams[m.qfa] ? teams[m.qfa].t1 : 'TBD'),
+      t2: w2 || (teams[m.qfb] ? teams[m.qfb].t1 : 'TBD'),
+    };
+  });
+
+  // Step 6: 3rd place + Final from SF winners/losers
+  const sf1 = teams['SF-1']||{t1:'TBD',t2:'TBD'};
+  const sf2 = teams['SF-2']||{t1:'TBD',t2:'TBD'};
+  const sf1w = advancer('SF-1'); const sf2w = advancer('SF-2');
+  const sf1l = sf1w ? (sf1w===sf1.t1 ? sf1.t2 : sf1.t1) : 'TBD';
+  const sf2l = sf2w ? (sf2w===sf2.t1 ? sf2.t2 : sf2.t1) : 'TBD';
+  teams['3RD']   = { t1: sf1l||'TBD', t2: sf2l||'TBD' };
+  teams['FINAL'] = { t1: sf1w||sf1.t1||'TBD', t2: sf2w||sf2.t1||'TBD' };
+
+  return teams;
+}
+
+// ====================================================
+// MATCHDAY LOGIC — group matches by date
+// ====================================================
+function getMatchdays(){
+  const days = {};
+  GROUP_MATCHES.forEach(m=>{
+    if(!days[m.date]) days[m.date]=[];
+    days[m.date].push(m.id);
+  });
+  return days;
+}
+
+function checkPerfectMatchdays(user){
+  // Returns count of perfect matchdays for user
+  const playerPM = ALL_PLAYERS.find(p=>p.realName===user||p.id===user)||ME||{};
+  const gp = playerPM.groupPicks||{};
+  const days = getMatchdays();
+  let perfect = 0;
+  Object.entries(days).forEach(([date, ids])=>{
+    const played = ids.filter(id=>ST.results[id]!==undefined);
+    if(played.length===0 || played.length<ids.length) return; // day not complete
+    const allCorrect = played.every(id=>{
+      const res = ST.results[id];
+      const pick = gp[id];
+      if(!pick) return false;
+      const actual = res.winner===GROUP_MATCHES.find(m=>m.id===id)?.t1?'w1':res.winner===GROUP_MATCHES.find(m=>m.id===id)?.t2?'w2':'draw';
+      return actual===pick;
+    });
+    if(allCorrect) perfect++;
+  });
+  return perfect;
+}
+
+function checkPerfectGroups(user){
+  // Returns count of groups where user predicted exact 1st/2nd/3rd/4th order correctly
+  const predicted = computeStandings(user);
+  const actual = computeStandings(null); // actual results only
+  let perfect = 0;
+  Object.keys(GROUPS).forEach(gk=>{
+    const pred = predicted[gk].map(r=>r.team);
+    const act = actual[gk].map(r=>r.team);
+    // Only check if all 6 matches in the group have results
+    const groupMatchIds = GROUP_MATCHES.filter(m=>m.group===gk).map(m=>m.id);
+    const allDone = groupMatchIds.every(id=>ST.results[id]!==undefined);
+    if(!allDone) return;
+    if(pred[0]===act[0]&&pred[1]===act[1]&&pred[2]===act[2]&&pred[3]===act[3]) perfect++;
+  });
+  return perfect;
 }
 
 // ====================================================
 // SCORING
 // ====================================================
 function calcScore(user){
-  const gp = ST.groupPicks[user]||{};
-  const kp = ST.koPicks[user]||{};
-  let correct=0,total=0,picks=0;
+  const player = ALL_PLAYERS.find(p=>p.realName===user||p.id===user)||{};
+  const gp = player.groupPicks||{};
+  const kp = player.koPicks||{};
+  const bp = player.bonusPicks||{};
+  let pts=0, correct=0, judged=0, picks=0;
 
-  // Group picks
+  // Group picks — 1pt each
   GROUP_MATCHES.forEach(m=>{
     const res = ST.results[m.id];
     const pick = gp[m.id];
     if(pick) picks++;
-    if(res && pick){
-      total++;
+    if(res!==undefined && pick){
+      judged++;
       const actualPick = res.winner===m.t1?'w1':res.winner===m.t2?'w2':'draw';
-      if(actualPick===pick) correct++;
+      if(actualPick===pick){correct++;pts+=1;}
     }
   });
 
-  // KO picks
+  // KO picks — 2pts each
   KNOCKOUT_MATCHES.forEach(m=>{
     const res = ST.results[m.id];
     const pick = kp[m.id];
     if(pick) picks++;
-    if(res && pick){
-      total++;
-      if(res.winner===pick) correct++;
+    if(res!==undefined && pick){
+      judged++;
+      if(res.winner===pick){correct++;pts+=2;}
     }
   });
 
-  const pct = total>0?Math.round(correct/total*100):0;
-  return {correct,total,picks,pct};
+  // Champion pick — 10pts
+  if(bp.champion) picks++;
+  if(ST.actualChampion && bp.champion){
+    judged++;
+    if(ST.actualChampion===bp.champion){correct++;pts+=25;}
+  }
+
+  // Top scorer pick — 5pts
+  if(bp.topScorer) picks++;
+  if(ST.actualTopScorer && bp.topScorer){
+    judged++;
+    if(ST.actualTopScorer===bp.topScorer){correct++;pts+=10;}
+  }
+
+  // Perfect matchday bonuses — +3pts each
+  const perfectDays = checkPerfectMatchdays(user);
+  pts += perfectDays * 3;
+
+  // Perfect group bonuses — +3pts each
+  const perfectGroups = checkPerfectGroups(user);
+  pts += perfectGroups * 3;
+
+  const pct = judged>0?Math.round(correct/judged*100):0;
+  return {pts, correct, judged, picks, pct, perfectDays, perfectGroups};
 }
 
 // ====================================================
 // RENDER: GROUPS TAB
 // ====================================================
 function renderGroups(){
+  if(!ME){ document.getElementById('groups-content').innerHTML='<div class="empty"><div class="eicon">👤</div><div class="etext">Sign in to make picks.</div></div>'; return; }
   const locked = isLocked();
   const html = Object.keys(GROUPS).map(gk=>{
     const g = GROUPS[gk];
@@ -672,49 +1086,63 @@ function renderGroups(){
 
 function renderGroupMatch(m, locked){
   const res = ST.results[m.id];
-  const userPick = ME?(ST.groupPicks[ME]||{})[m.id]:null;
-  const winner = res?.winner;
-  const score1 = res?.score1??'';
-  const score2 = res?.score2??'';
+  const userPick = ME?(ME.groupPicks||{})[m.id]:null;
+  const winner = res?.winner; // null = draw, undefined = no result yet
+  const hasResult = res !== undefined;
 
   let w1c='',w2c='';
-  if(winner){w1c=winner===m.t1?'winner':'loser';w2c=winner===m.t2?'winner':'loser';}
+  if(hasResult){
+    w1c=winner===m.t1?'winner':'loser';
+    w2c=winner===m.t2?'winner':'loser';
+    if(winner===null){w1c='draw-pick';w2c='draw-pick';}
+  }
 
-  const badge = winner
-    ? `<span class="badge bdone">✓ Done</span>`
+  const resultLabel = !hasResult ? '' : winner===null ? 'Draw' : `${fl(winner)} ${winner}`;
+  const badge = hasResult
+    ? `<span class="badge bdone">✓ ${resultLabel}</span>`
     : locked ? `<span class="badge blocked">🔒 Locked</span>`
     : `<span class="badge bup">Upcoming</span>`;
 
-  // Pick buttons (only if not locked and no result yet)
-  let pickBtns = '';
-  if(!locked && !winner){
-    pickBtns = `<div class="pick-btns">
+  // Before tournament: show pick buttons. After lock or result entered: show result buttons.
+  let bottomRow = '';
+  if(hasResult){
+    // Show result as set, with option to change
+    bottomRow = `<div class="pick-btns" style="margin-top:9px">
+      <button class="pbtn pbtn-w1 ${winner===m.t1?'sel':''}" onclick="setResult('${m.id}','${m.t1}','${m.t2}','w1')">${fl(m.t1)} WIN</button>
+      <button class="pbtn pbtn-draw ${winner===null?'sel':''}" onclick="setResult('${m.id}','${m.t1}','${m.t2}','draw')">DRAW</button>
+      <button class="pbtn pbtn-w2 ${winner===m.t2?'sel':''}" onclick="setResult('${m.id}','${m.t1}','${m.t2}','w2')">${fl(m.t2)} WIN</button>
+    </div>`;
+  } else if(!locked){
+    // Pre-tournament: pick buttons only
+    bottomRow = `<div class="pick-btns" style="margin-top:9px">
       <button class="pbtn pbtn-w1 ${userPick==='w1'?'sel':''}" onclick="groupPick('${m.id}','w1')">${fl(m.t1)} WIN</button>
       <button class="pbtn pbtn-draw ${userPick==='draw'?'sel':''}" onclick="groupPick('${m.id}','draw')">DRAW</button>
       <button class="pbtn pbtn-w2 ${userPick==='w2'?'sel':''}" onclick="groupPick('${m.id}','w2')">${fl(m.t2)} WIN</button>
     </div>`;
-  } else if(userPick && !winner){
-    const label = userPick==='w1'?`${fl(m.t1)} Win`:userPick==='w2'?`${fl(m.t2)} Win`:'Draw';
-    pickBtns = `<div style="margin-top:8px;font-size:11px;color:var(--muted2)">Your pick: <strong style="color:var(--text)">${label}</strong></div>`;
+  } else {
+    // Locked, no result yet — show result entry
+    bottomRow = `<div class="pick-btns" style="margin-top:9px">
+      <button class="pbtn pbtn-w1" onclick="setResult('${m.id}','${m.t1}','${m.t2}','w1')">${fl(m.t1)} WIN</button>
+      <button class="pbtn pbtn-draw" onclick="setResult('${m.id}','${m.t1}','${m.t2}','draw')">DRAW</button>
+      <button class="pbtn pbtn-w2" onclick="setResult('${m.id}','${m.t1}','${m.t2}','w2')">${fl(m.t2)} WIN</button>
+    </div>`;
   }
 
-  // Score inputs (anyone can enter actual results)
-  const scoreRow = `<div class="sinputs">
-    <input class="sinput" type="number" id="s1-${m.id}" value="${score1}" placeholder="${m.t1.slice(0,3)}" min="0" max="30">
-    <span style="color:var(--muted);font-size:11px">–</span>
-    <input class="sinput" type="number" id="s2-${m.id}" value="${score2}" placeholder="${m.t2.slice(0,3)}" min="0" max="30">
-    <button class="ssbtn" onclick="submitResult('${m.id}','${m.t1}','${m.t2}')">Set</button>
-  </div>`;
+  const rowLabel = hasResult
+    ? `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.5px">RESULT (tap to change)</div>`
+    : locked ? `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.5px">ENTER RESULT</div>`
+    : userPick ? `<div style="font-size:9px;color:var(--green);text-align:center;margin-top:3px;letter-spacing:.5px">YOUR PICK ✓</div>`
+    : `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.5px">YOUR PICK</div>`;
 
   return `<div class="mcard">
     <div class="mlabel"><span>${m.label||'Match'}</span><span class="mdate">${m.date||''}</span>${badge}</div>
     <div class="mteams">
-      <div class="trow ${w1c}"><div class="tname"><span class="tflag">${fl(m.t1)}</span>${m.t1}</div><div class="tscore">${score1}</div></div>
+      <div class="trow ${w1c}"><div class="tname"><span class="tflag">${fl(m.t1)}</span>${m.t1}</div></div>
       <div class="vsline">VS</div>
-      <div class="trow ${w2c}"><div class="tname"><span class="tflag">${fl(m.t2)}</span>${m.t2}</div><div class="tscore">${score2}</div></div>
+      <div class="trow ${w2c}"><div class="tname"><span class="tflag">${fl(m.t2)}</span>${m.t2}</div></div>
     </div>
-    ${pickBtns}
-    ${scoreRow}
+    ${bottomRow}
+    ${rowLabel}
   </div>`;
 }
 
@@ -722,45 +1150,45 @@ function renderGroupMatch(m, locked){
 // GROUP PICK
 // ====================================================
 function groupPick(matchId, pick){
-  if(!ME){showToast('Pick your name first ☝️');return;}
+  if(!ME){showToast('Select your name first ☝️');return;}
   if(isLocked()){showToast('🔒 Picks are locked!');return;}
-  if(!ST.groupPicks[ME]) ST.groupPicks[ME]={};
-  if(ST.groupPicks[ME][matchId]===pick){
-    delete ST.groupPicks[ME][matchId];
+  if(ME.groupPicks[matchId]===pick){
+    delete ME.groupPicks[matchId];
     showToast('Pick removed');
   } else {
-    ST.groupPicks[ME][matchId]=pick;
+    ME.groupPicks[matchId]=pick;
     const m = GROUP_MATCHES.find(x=>x.id===matchId);
     const label = pick==='w1'?`${m.t1} Win`:pick==='w2'?`${m.t2} Win`:'Draw';
     showToast(`Picked: ${label}`);
   }
-  saveState();
+  saveMyPicks();
   renderGroups();
 }
 
 // ====================================================
-// SUBMIT ACTUAL RESULT
+// SET ACTUAL RESULT (button-based, no scores)
 // ====================================================
-function submitResult(matchId, t1, t2){
-  const s1 = parseInt(document.getElementById('s1-'+matchId)?.value);
-  const s2 = parseInt(document.getElementById('s2-'+matchId)?.value);
-  if(isNaN(s1)||isNaN(s2)){showToast('Enter both scores!');return;}
-  const m = [...GROUP_MATCHES,...KNOCKOUT_MATCHES].find(x=>x.id===matchId);
-  const isKO = KNOCKOUT_MATCHES.some(x=>x.id===matchId);
-  let winner;
-  if(s1>s2) winner=t1;
-  else if(s2>s1) winner=t2;
-  else if(isKO){showToast('Knockout — no draws! Set a winner.');return;}
-  else winner=null; // draw ok in group stage
-  ST.results[matchId]={winner,score1:s1,score2:s2};
-  saveState();
+async function setResult(matchId, t1, t2, outcome){
+  const existing = ST.results[matchId];
+  const existingOutcome = existing?.winner===t1?'w1':existing?.winner===t2?'w2':existing?.winner===null?'draw':null;
+  if(existingOutcome===outcome){
+    // Clear result
+    await sb.from('wc2026_results').delete().eq('match_id',matchId);
+    delete ST.results[matchId];
+    renderAll();
+    showToast('Result cleared');
+    return;
+  }
+  const winner = outcome==='w1'?t1:outcome==='w2'?t2:null;
+  await saveResult(matchId, winner);
   renderAll();
-  if(winner) showToast(`✅ ${fl(winner)} ${winner||'Draw'} saved!`);
-  else showToast('✅ Draw saved!');
+  const label = winner?`${fl(winner)} ${winner} wins`:'Draw';
+  showToast(`✅ ${label}!`);
 }
 
-function submitKOResult(matchId,t1,t2){
-  submitResult(matchId,t1,t2);
+function setKOResult(matchId, t1, t2, outcome){
+  if(outcome==='draw'){showToast('No draws in knockout!');return;}
+  setResult(matchId,t1,t2,outcome);
 }
 
 // ====================================================
@@ -768,10 +1196,17 @@ function submitKOResult(matchId,t1,t2){
 // ====================================================
 function renderKnockout(){
   const rounds = ['R32','R16','QF','SF','3RD','FINAL'];
-  const labels = {R32:'ROUND OF 32',R16:'ROUND OF 16',QF:'QUARTER FINALS',SF:'SEMI FINALS','3RD':'THIRD PLACE','FINAL':'🏆 THE FINAL'};
+  const labels = {R32:'ROUND OF 32',R16:'ROUND OF 16',QF:'QUARTER FINALS',SF:'SEMI FINALS','3RD':'🥉 THIRD PLACE','FINAL':'🏆 THE FINAL'};
+  // Resolve teams for current user's predicted bracket
+  const resolvedTeams = ME ? resolveKOTeams(ME.realName) : {};
   const html = rounds.map(r=>{
     const matches = KNOCKOUT_MATCHES.filter(m=>m.round===r);
-    const mhtml = matches.map(m=>renderKOMatch(m)).join('');
+    const mhtml = matches.map(m=>{
+      // Always use resolved teams — they come from user's group picks + KO picks
+      const resolved = resolvedTeams[m.id]||{t1:'TBD',t2:'TBD'};
+      const enriched = { ...m, t1: resolved.t1||'TBD', t2: resolved.t2||'TBD' };
+      return renderKOMatch(enriched);
+    }).join('');
     return `<div class="sec-title">${labels[r]}<span class="sec-count">${matches.length} match${matches.length>1?'es':''}</span></div>
     <div class="mgrid" style="margin-bottom:24px">${mhtml}</div>`;
   }).join('');
@@ -780,7 +1215,7 @@ function renderKnockout(){
 
 function renderKOMatch(m){
   const res = ST.results[m.id];
-  const userPick = ME?(ST.koPicks[ME]||{})[m.id]:null;
+  const userPick = ME?(ME.koPicks||{})[m.id]:null;
   const winner = res?.winner;
   const s1=res?.score1??'', s2=res?.score2??'';
 
@@ -790,45 +1225,50 @@ function renderKOMatch(m){
   const isTBD = m.t1==='TBD'||m.t2==='TBD';
   const badge = winner ? `<span class="badge bdone">✓ Done</span>` : isTBD ? `<span class="badge bup">TBD</span>` : `<span class="badge bup">Upcoming</span>`;
 
-  let pickBtns='';
-  if(!isTBD && !winner && ME){
-    pickBtns=`<div class="pick-btns">
+  let bottomRow = '';
+  let rowLabel = '';
+  if(isTBD){
+    bottomRow = '';
+    rowLabel = '';
+  } else if(winner){
+    // Result set — show it, allow change
+    bottomRow = `<div class="pick-btns" style="margin-top:9px">
+      <button class="pbtn pbtn-w1 ${winner===m.t1?'sel':''}" onclick="setKOResult('${m.id}','${m.t1}','${m.t2}','w1')">${fl(m.t1)} WIN</button>
+      <button class="pbtn pbtn-w2 ${winner===m.t2?'sel':''}" onclick="setKOResult('${m.id}','${m.t1}','${m.t2}','w2')">${fl(m.t2)} WIN</button>
+    </div>`;
+    rowLabel = `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.5px">RESULT (tap to change)</div>`;
+  } else if(ME){
+    // No result — show pick buttons
+    bottomRow = `<div class="pick-btns" style="margin-top:9px">
       <button class="pbtn pbtn-w1 ${userPick===m.t1?'sel':''}" onclick="koPick('${m.id}','${m.t1}')">${fl(m.t1)} WIN</button>
       <button class="pbtn pbtn-w2 ${userPick===m.t2?'sel':''}" onclick="koPick('${m.id}','${m.t2}')">${fl(m.t2)} WIN</button>
     </div>`;
-  } else if(userPick && !winner){
-    pickBtns=`<div style="margin-top:8px;font-size:11px;color:var(--muted2)">Your pick: <strong style="color:var(--text)">${fl(userPick)} ${userPick}</strong></div>`;
+    rowLabel = userPick
+      ? `<div style="font-size:9px;color:var(--green);text-align:center;margin-top:3px;letter-spacing:.5px">YOUR PICK ✓</div>`
+      : `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.5px">YOUR PICK · ENTER RESULT</div>`;
   }
-
-  const scoreRow=`<div class="sinputs">
-    <input class="sinput" type="number" id="s1-${m.id}" value="${s1}" placeholder="${m.t1.slice?m.t1.slice(0,3):'?'}" min="0" max="30">
-    <span style="color:var(--muted);font-size:11px">–</span>
-    <input class="sinput" type="number" id="s2-${m.id}" value="${s2}" placeholder="${m.t2.slice?m.t2.slice(0,3):'?'}" min="0" max="30">
-    <button class="ssbtn" onclick="submitKOResult('${m.id}','${m.t1}','${m.t2}')">Set</button>
-  </div>`;
 
   return `<div class="mcard">
     <div class="mlabel"><span>${m.label}</span>${badge}</div>
     <div class="mteams">
-      <div class="trow ${t1c}"><div class="tname"><span class="tflag">${fl(m.t1)}</span>${m.t1}</div><div class="tscore">${s1}</div></div>
+      <div class="trow ${t1c}"><div class="tname"><span class="tflag">${fl(m.t1)}</span>${m.t1}</div></div>
       <div class="vsline">VS</div>
-      <div class="trow ${t2c}"><div class="tname"><span class="tflag">${fl(m.t2)}</span>${m.t2}</div><div class="tscore">${s2}</div></div>
+      <div class="trow ${t2c}"><div class="tname"><span class="tflag">${fl(m.t2)}</span>${m.t2}</div></div>
     </div>
-    ${pickBtns}
-    ${scoreRow}
+    ${bottomRow}
+    ${rowLabel}
   </div>`;
 }
 
 function koPick(matchId, team){
-  if(!ME){showToast('Pick your name first ☝️');return;}
-  if(!ST.koPicks[ME]) ST.koPicks[ME]={};
-  if(ST.koPicks[ME][matchId]===team){
-    delete ST.koPicks[ME][matchId];showToast('Pick removed');
+  if(!ME){showToast('Select your name first ☝️');return;}
+  if(ME.koPicks[matchId]===team){
+    delete ME.koPicks[matchId];showToast('Pick removed');
   } else {
-    ST.koPicks[ME][matchId]=team;
+    ME.koPicks[matchId]=team;
     showToast(`${fl(team)} ${team} picked!`);
   }
-  saveState();renderKnockout();
+  saveMyPicks();renderKnockout();
 }
 
 // ====================================================
@@ -837,24 +1277,27 @@ function koPick(matchId, team){
 function renderMyPicks(){
   const el = document.getElementById('mypicks-content');
   if(!ME){
-    el.innerHTML=`<div class="empty"><div class="eicon">👤</div><div class="etext">Select your name in the top right!</div></div>`;
+    el.innerHTML=`<div class="empty"><div class="eicon">👤</div><div class="etext">Sign in to see your picks.</div></div>`;
     return;
   }
-  const sc = calcScore(ME);
-  const gp = ST.groupPicks[ME]||{};
-  const kp = ST.koPicks[ME]||{};
+  const sc = calcScore(ME.realName);
+  const gp = ME.groupPicks||{};
+  const kp = ME.koPicks||{};
 
   const totalGroupMatches = GROUP_MATCHES.length;
-  const totalKOMatches = KNOCKOUT_MATCHES.filter(m=>m.t1!=='TBD'&&m.t2!=='TBD').length;
   const groupPicked = GROUP_MATCHES.filter(m=>gp[m.id]).length;
 
   const progress = `
     <div class="pprogress">
+      <div><div class="ppnum" style="color:var(--gold);font-size:30px">${sc.pts}</div><div class="pplabel">Total Pts</div></div>
       <div><div class="ppnum" style="color:var(--green)">${sc.correct}</div><div class="pplabel">Correct</div></div>
-      <div><div class="ppnum">${sc.total}</div><div class="pplabel">Judged</div></div>
-      <div><div class="ppnum" style="color:var(--gold)">${groupPicked}/${totalGroupMatches}</div><div class="pplabel">Group Picks</div></div>
       <div><div class="ppnum" style="color:var(--blue)">${sc.pct}%</div><div class="pplabel">Accuracy</div></div>
-    </div>`;
+      <div><div class="ppnum" style="color:var(--gold)">${groupPicked}/${totalGroupMatches}</div><div class="pplabel">Picks Made</div></div>
+    </div>
+    ${sc.perfectDays>0||sc.perfectGroups>0?`<div style="background:rgba(255,215,0,.06);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;display:flex;gap:20px;flex-wrap:wrap">
+      ${sc.perfectDays>0?`<span>🎯 <strong style="color:var(--gold)">${sc.perfectDays}</strong> perfect matchday${sc.perfectDays>1?'s':''} (+${sc.perfectDays*3}pts)</span>`:''}
+      ${sc.perfectGroups>0?`<span>🏆 <strong style="color:var(--gold)">${sc.perfectGroups}</strong> perfect group${sc.perfectGroups>1?'s':''} (+${sc.perfectGroups*3}pts)</span>`:''}
+    </div>`:''}`;
 
   // Group picks summary
   const gpRows = GROUP_MATCHES.map(m=>{
@@ -898,30 +1341,29 @@ function renderMyPicks(){
 // ====================================================
 function renderFriends(){
   // Build list of all users who have ANY picks
-  const allUsers = new Set([...Object.keys(ST.groupPicks),...Object.keys(ST.koPicks)]);
-  // Also show all 10 default slots
-  PLAYER_NAMES.forEach(p=>allUsers.add(p));
-  const userList = [...allUsers];
-
   const fgrid = document.getElementById('fgrid');
-  fgrid.innerHTML = userList.map(u=>{
-    const sc = calcScore(u);
-    return `<div class="fcard ${activeFriend===u?'active':''}" onclick="viewFriend('${u}')">
+  fgrid.innerHTML = ALL_PLAYERS.map(u=>{
+    const sc = calcScore(u.realName);
+    const isMe = ME && u.id===ME.id;
+    return `<div class="fcard ${activeFriend===u.id?'active':''}" onclick="viewFriend('${u.id}')">
       <div class="favatar">👤</div>
-      <div class="fname">${u}</div>
-      <div class="fscore"><span>${sc.correct}</span> correct / ${sc.total} judged</div>
+      <div class="fname">${u.teamName}${isMe?' <span style=\"color:var(--green);font-size:10px\">(you)</span>':''}</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:3px">${u.realName}</div>
+      <div class="fscore"><span>${sc.pts}</span> pts · ${sc.correct} correct</div>
     </div>`;
   }).join('');
 
   const fd = document.getElementById('friend-detail');
   if(!activeFriend){fd.innerHTML='';return;}
 
-  const gp = ST.groupPicks[activeFriend]||{};
-  const kp = ST.koPicks[activeFriend]||{};
+  const friendPlayer = ALL_PLAYERS.find(p=>p.id===activeFriend);
+  if(!friendPlayer){fd.innerHTML='';return;}
+  const gp = friendPlayer.groupPicks||{};
+  const kp = friendPlayer.koPicks||{};
   const picked = GROUP_MATCHES.filter(m=>gp[m.id]).length + KNOCKOUT_MATCHES.filter(m=>kp[m.id]).length;
 
   if(picked===0){
-    fd.innerHTML=`<div class="empty"><div class="eicon">🏳️</div><div class="etext">${activeFriend} hasn't made any picks yet.</div></div>`;
+    fd.innerHTML=`<div class="empty"><div class="eicon">🏳️</div><div class="etext">${friendPlayer.teamName} hasn't made any picks yet.</div></div>`;
     return;
   }
 
@@ -935,29 +1377,33 @@ function renderFriends(){
       <span style="color:var(--muted)">${m.id}</span><span>${label}</span>${badge}</div>`;
   }).filter(Boolean).join('');
 
-  fd.innerHTML=`<div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--muted);margin-bottom:12px">${activeFriend}'s picks</div>
+  fd.innerHTML=`<div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--muted);margin-bottom:12px">${friendPlayer.teamName}'s picks</div>
   <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">
     ${gpRows||'<div style="padding:16px;font-size:13px;color:var(--muted);text-align:center">No group picks</div>'}
   </div>`;
 }
 
-function viewFriend(name){activeFriend=activeFriend===name?null:name;renderFriends();}
+function viewFriend(id){activeFriend=activeFriend===id?null:id;renderFriends();}
 
 // ====================================================
 // RENDER: LEADERBOARD
 // ====================================================
 function renderLeaderboard(){
-  const allUsers = new Set([...Object.keys(ST.groupPicks),...Object.keys(ST.koPicks)]);
-  PLAYER_NAMES.forEach(p=>allUsers.add(p));
-  const scored = [...allUsers].map(u=>({name:u,...calcScore(u)}));
-  scored.sort((a,b)=>b.correct-a.correct||b.pct-a.pct);
+  const scored = ALL_PLAYERS.map(p=>({...p,...calcScore(p.realName)}));
+  scored.sort((a,b)=>b.pts-a.pts||b.pct-a.pct);
+  const isMe = p => ME && p.id===ME.id;
   document.getElementById('lb-body').innerHTML = scored.map((u,i)=>`
-    <div class="lbrow">
+    <div class="lbrow" style="${isMe(u)?'background:rgba(0,200,83,.04);border-left:2px solid var(--green);':''}">
       <div class="lbrank">${i+1}</div>
-      <div class="lbname">${u.name}${u.name===ME?' <span style="color:var(--green);font-size:11px">(you)</span>':''}</div>
+      <div class="lbname">
+        <div style="font-weight:600">${u.teamName}${isMe(u)?' <span style="color:var(--green);font-size:10px">(you)</span>':''}</div>
+        <div style="font-size:11px;color:var(--muted)">${u.realName}</div>
+        ${u.perfectDays>0?`<span title="perfect matchdays" style="font-size:10px">🎯×${u.perfectDays}</span>`:''}
+        ${u.perfectGroups>0?`<span title="perfect groups" style="font-size:10px;margin-left:2px">📊×${u.perfectGroups}</span>`:''}
+      </div>
+      <div class="lbstat" style="color:var(--gold);font-weight:700;font-size:16px">${u.pts}</div>
       <div class="lbstat lbcor">${u.correct}</div>
-      <div class="lbstat" style="color:var(--muted2)">${u.picks}</div>
-      <div class="lbstat" style="color:var(--muted2)">${u.total}</div>
+      <div class="lbstat" style="color:var(--muted2)">${u.judged}</div>
       <div class="lbstat lbpct">${u.pct}%</div>
     </div>`).join('');
 }
@@ -972,20 +1418,263 @@ function showToast(msg){
   window._toastTimer=setTimeout(()=>t.classList.remove('show'),2800);
 }
 
+
+// ====================================================
+// RENDER: BONUS PICKS
+// ====================================================
+const ALL_TEAMS = Object.values(GROUPS).flatMap(g=>g.teams).sort();
+const TOP_SCORERS = [
+  'Kylian Mbappé','Erling Haaland','Vinicius Jr.','Lionel Messi','Cristiano Ronaldo',
+  'Harry Kane','Lautaro Martínez','Antoine Griezmann','Bukayo Saka','Phil Foden',
+  'Pedri','Rodri','Gavi','Federico Valverde','Jude Bellingham',
+  'Marcus Rashford','Leroy Sané','Jamal Musiala','Rafael Leão','Bernardo Silva',
+  'Romelu Lukaku','Robert Lewandowski','Memphis Depay','Cody Gakpo','Wout Weghorst',
+  'Mohammed Salah','Sadio Mané','Achraf Hakimi','Youssef En-Nesyri','Karim Adeyemi',
+  'Darwin Núñez','Luis Díaz','Richarlison','Gabriel Martinelli','Dusan Vlahovic',
+].sort();
+
+function renderBonus(){
+  const el = document.getElementById('bonus-content');
+  if(!ME){
+    el.innerHTML=`<div class="empty"><div class="eicon">⭐</div><div class="etext">Sign in to make bonus picks.</div></div>`;
+    return;
+  }
+  const locked = isLocked();
+  const bp = ME ? (ME.bonusPicks||{}) : {};
+
+  const champPicked = bp.champion||'';
+  const scorerPicked = bp.topScorer||'';
+
+  // Actual results (admin set)
+  const actualChamp = ST.actualChampion||'';
+  const actualScorer = ST.actualTopScorer||'';
+
+  const champStatus = !actualChamp ? '' : champPicked===actualChamp
+    ? `<span class="badge bdone">✓ +10pts</span>`
+    : champPicked ? `<span class="badge blive">✗ Wrong</span>` : '';
+  const scorerStatus = !actualScorer ? '' : scorerPicked===actualScorer
+    ? `<span class="badge bdone">✓ +5pts</span>`
+    : scorerPicked ? `<span class="badge blive">✗ Wrong</span>` : '';
+
+  const champTeamOpts = ALL_TEAMS.map(t=>`<option value="${t}" ${champPicked===t?'selected':''}>${fl(t)} ${t}</option>`).join('');
+  const scorerOpts = TOP_SCORERS.map(p=>`<option value="${p}" ${scorerPicked===p?'selected':''}>${p}</option>`).join('');
+
+  el.innerHTML = `
+    <div style="max-width:540px;margin:0 auto">
+
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:16px;font-size:13px;line-height:1.8">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:var(--muted);margin-bottom:10px">SCORING GUIDE</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;color:var(--muted2)">
+          <span>Group stage correct</span><span style="color:var(--text);font-weight:600">+1 pt</span>
+          <span>Knockout correct</span><span style="color:var(--text);font-weight:600">+2 pts</span>
+          <span>Perfect matchday</span><span style="color:var(--gold);font-weight:600">+3 pts</span>
+          <span>Perfect group table</span><span style="color:var(--gold);font-weight:600">+3 pts</span>
+          <span>Champion pick</span><span style="color:var(--gold);font-weight:600">+25 pts</span>
+          <span>Golden Boot pick</span><span style="color:var(--gold);font-weight:600">+10 pts</span>
+        </div>
+      </div>
+
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin-bottom:16px" id="third-rank-card">
+        <div style="margin-bottom:14px">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px">🔀 3RD PLACE QUALIFIERS</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">Drag to rank all 12 third-place teams. <strong style="color:var(--text)">Top 8 advance</strong> to the Round of 32.</div>
+        </div>
+        <div id="third-rank-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        ${!locked?`<div style="font-size:11px;color:var(--muted);margin-top:10px">Drag rows to reorder · your ranking seeds your knockout bracket</div>`:''}
+      </div>
+
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+          <div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px">🏆 WORLD CUP CHAMPION</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">Worth <strong style="color:var(--gold)">+25 pts</strong> if correct</div>
+          </div>
+          ${champStatus}
+        </div>
+        ${locked && !actualChamp ? `<div style="font-size:13px;color:var(--muted2)">${champPicked ? `Your pick: <strong style="color:var(--text)">${fl(champPicked)} ${champPicked}</strong>` : 'No pick made'}</div>` : ''}
+        ${!locked ? `<select onchange="setBonusPick('champion',this.value)" style="width:100%;background:var(--card2);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
+          <option value="">— Pick the champion —</option>
+          ${champTeamOpts}
+        </select>` : ''}
+        ${actualChamp ? `<div style="margin-top:12px;font-size:13px;color:var(--muted2)">Actual champion: <strong style="color:var(--text)">${fl(actualChamp)} ${actualChamp}</strong></div>` : ''}
+        ${!locked&&champPicked ? `<div style="margin-top:8px;font-size:11px;color:var(--green)">✓ Picked: ${fl(champPicked)} ${champPicked}</div>` : ''}
+      </div>
+
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+          <div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px">⚽ GOLDEN BOOT</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">Worth <strong style="color:var(--gold)">+10 pts</strong> if correct</div>
+          </div>
+          ${scorerStatus}
+        </div>
+        ${locked && !actualScorer ? `<div style="font-size:13px;color:var(--muted2)">${scorerPicked ? `Your pick: <strong style="color:var(--text)">${scorerPicked}</strong>` : 'No pick made'}</div>` : ''}
+        ${!locked ? `<select onchange="setBonusPick('topScorer',this.value)" style="width:100%;background:var(--card2);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer">
+          <option value="">— Pick the top scorer —</option>
+          ${scorerOpts}
+        </select>` : ''}
+        ${actualScorer ? `<div style="margin-top:12px;font-size:13px;color:var(--muted2)">Actual top scorer: <strong style="color:var(--text)">${actualScorer}</strong></div>` : ''}
+        ${!locked&&scorerPicked ? `<div style="margin-top:8px;font-size:11px;color:var(--green)">✓ Picked: ${scorerPicked}</div>` : ''}
+      </div>
+
+
+    </div>`;
+  renderThirdRankList();
+}
+
+function renderThirdRankList(){
+  const el = document.getElementById('third-rank-list');
+  if(!el) return;
+  const locked = isLocked();
+  if(!ME.bonusPicks) ME.bonusPicks={};
+  let ranking = ME.bonusPicks.thirdRanking || Object.keys(GROUPS);
+  // Make sure all 12 groups are present
+  const allGroups = Object.keys(GROUPS);
+  allGroups.forEach(g=>{ if(!ranking.includes(g)) ranking.push(g); });
+  ranking = ranking.filter(g=>allGroups.includes(g));
+  ME.bonusPicks.thirdRanking = ranking;
+
+  const standings = computeStandings(ME);
+
+  el.innerHTML = ranking.map((gk,i)=>{
+    const st = standings[gk];
+    const team = st&&st[2] ? st[2].team : '?';
+    const pts = st&&st[2] ? st[2].pts : 0;
+    const qualifies = i < 8;
+    return `<div class="rank-row" data-group="${gk}" draggable="${!locked}" style="
+      display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:7px;
+      background:${qualifies?'rgba(0,200,83,.07)':'rgba(229,57,53,.05)'};
+      border:1px solid ${qualifies?'rgba(0,200,83,.2)':'rgba(229,57,53,.15)'};
+      cursor:${locked?'default':'grab'};user-select:none;transition:opacity .15s;
+    ">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:${qualifies?'var(--green)':'var(--muted)'};width:22px;text-align:center">${i+1}</div>
+      <div style="font-size:13px;flex:1;font-weight:500">${fl(team)} ${team} <span style="color:var(--muted);font-size:11px">(Group ${gk})</span></div>
+      <div style="font-size:11px;color:var(--muted2)">${pts}pts predicted</div>
+      <div style="font-size:11px;font-weight:700;${qualifies?'color:var(--green)':'color:var(--red)'}">${qualifies?'✓ IN':'✗ OUT'}</div>
+      ${!locked?'<div style="color:var(--muted);font-size:16px;cursor:grab">⠿</div>':''}
+    </div>`;
+  }).join('');
+
+  if(!locked) initDragDrop();
+}
+
+function initDragDrop(){
+  const list = document.getElementById('third-rank-list');
+  if(!list) return;
+  let dragging = null;
+
+  list.querySelectorAll('.rank-row').forEach(row=>{
+    row.addEventListener('dragstart', e=>{ dragging=row; setTimeout(()=>row.style.opacity='.4',0); });
+    row.addEventListener('dragend', ()=>{ dragging.style.opacity='1'; dragging=null; saveThirdRanking(); });
+    row.addEventListener('dragover', e=>{ e.preventDefault(); if(dragging&&dragging!==row){ 
+      const rect=row.getBoundingClientRect();
+      const mid=rect.top+rect.height/2;
+      if(e.clientY<mid) list.insertBefore(dragging,row);
+      else list.insertBefore(dragging,row.nextSibling);
+    }});
+  });
+}
+
+function saveThirdRanking(){
+  const list = document.getElementById('third-rank-list');
+  if(!list||!ME) return;
+  const ranking = [...list.querySelectorAll('.rank-row')].map(r=>r.dataset.group);
+  if(!ME.bonusPicks) ME.bonusPicks={};
+  ME.bonusPicks.thirdRanking = ranking;
+  
+  renderThirdRankList(); // re-render to update colors/labels
+  renderThirdRankList();
+}
+
+// called after renderBonus sets innerHTML
+function postRenderBonus(){ renderThirdRankList(); }
+
+function setBonusPick(type, val){
+  if(!ME||!val) return;
+  if(isLocked()){showToast('🔒 Picks are locked!');return;}
+  if(!ME.bonusPicks) ME.bonusPicks={};
+  ME.bonusPicks[type]=val;
+  
+  const label = type==='champion'?`${fl(val)} ${val}`:val;
+  showToast(`${type==='champion'?'🏆':'⚽'} ${label} picked!`);
+  renderBonus();
+  setTimeout(renderThirdRankList, 0);
+}
+
+async function setActual(type){
+  const sel = document.getElementById(type==='champion'?'set-champ-sel':'set-scorer-sel');
+  const val = sel?.value;
+  if(!val){showToast('Select a value first');return;}
+  if(type==='champion') ST.actualChampion=val;
+  else ST.actualTopScorer=val;
+  await saveMeta(type==='champion'?'actualChampion':'actualTopScorer', val);
+  showToast(`✅ Actual ${type==='champion'?'champion':'top scorer'} set: ${val}`);
+  renderAll();
+}
+
 // ====================================================
 // RENDER ALL
 // ====================================================
 function renderAll(){
   if(activeTab==='groups') renderGroups();
   if(activeTab==='knockout') renderKnockout();
+  if(activeTab==='bonus') renderBonus();
   if(activeTab==='mypicks') renderMyPicks();
   if(activeTab==='friends') renderFriends();
   if(activeTab==='leaderboard') renderLeaderboard();
 }
 
-// Boot
-if(isLocked()) document.getElementById('lockbanner').style.display='block';
-renderAll();
+// ====================================================
+// BOOT
+// ====================================================
+async function boot(){
+  console.log('Boot started, supabase:', typeof supabase);
+  if(false){
+    document.getElementById('modal').innerHTML = '<div class="mbox"><div class="mflag">⚠️</div><div class="mtitle">Load Error</div><div class="msub">Supabase failed to load. Check connection and refresh.</div></div>';
+    return;
+  }
+  sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+  console.log('Supabase client created');
+  // Load all shared data from Supabase
+  try {
+    await Promise.all([loadResults(), loadMeta(), loadAllPlayers()]);
+    console.log('Data loaded. Players:', ALL_PLAYERS.length, 'Results:', Object.keys(ST.results).length);
+  } catch(e) {
+    console.error('Boot load error:', e);
+    showToast('⚠️ Connection error — check console');
+  }
+
+  // Try to restore session from localStorage
+  const savedId = loadSessionId();
+  if(savedId){
+    const player = ALL_PLAYERS.find(p=>p.id===savedId);
+    if(player){
+      ME = {...player};
+      updateHeaderName();
+      document.getElementById('modal').style.display='none';
+      if(isLocked()) document.getElementById('lockbanner').style.display='block';
+      renderAll();
+      return;
+    }
+  }
+
+  // No session — show modal
+  document.getElementById('modal').style.display='flex';
+  showModalScreen(1);
+
+  // Poll for updates every 30s
+  setInterval(async()=>{
+    await Promise.all([loadResults(), loadMeta(), loadAllPlayers()]);
+    if(ME){
+      // Refresh ME from latest data
+      const fresh = ALL_PLAYERS.find(p=>p.id===ME.id);
+      if(fresh) ME = {...fresh};
+    }
+    renderAll();
+  }, 30000);
+}
+
+boot();
 </script>
 </body>
 </html>
