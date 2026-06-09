@@ -276,6 +276,11 @@ const supabase = {
           <input id="input-teamname" type="text" placeholder="e.g. Messi's Accountant" maxlength="30"
             style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:15px;">
         </div>
+        <div>
+          <label style="font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">Set a 4-digit PIN <span style="color:var(--muted);font-weight:400;text-transform:none">(to protect your bracket)</span></label>
+          <input id="input-pin" type="password" inputmode="numeric" placeholder="e.g. 1234" maxlength="4" pattern="[0-9]{4}"
+            style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:15px;letter-spacing:6px;">
+        </div>
       </div>
       <div id="modal-error" style="color:var(--red);font-size:12px;margin-bottom:12px;display:none"></div>
       <button class="mbtn" onclick="submitIdentity()">Save & Enter Bracket →</button>
@@ -290,10 +295,17 @@ const supabase = {
       <div class="mflag">🔑</div>
       <div class="mtitle">Restore Bracket</div>
       <div class="msub">Enter your real name to reload your picks</div>
-      <div style="margin-bottom:16px;text-align:left">
-        <label style="font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">Your Real Name</label>
-        <input id="input-restore" type="text" placeholder="e.g. Pranay" maxlength="30"
-          style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:15px;">
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px;text-align:left">
+        <div>
+          <label style="font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">Your Real Name</label>
+          <input id="input-restore" type="text" placeholder="e.g. Pranay" maxlength="30"
+            style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:15px;">
+        </div>
+        <div>
+          <label style="font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">Your PIN</label>
+          <input id="input-restore-pin" type="password" inputmode="numeric" placeholder="4-digit PIN" maxlength="4"
+            style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:15px;letter-spacing:6px;">
+        </div>
       </div>
       <div id="restore-error" style="color:var(--red);font-size:12px;margin-bottom:12px;display:none"></div>
       <button class="mbtn" onclick="restoreByName()">Restore →</button>
@@ -623,6 +635,7 @@ async function loadAllPlayers(){
       bonusPicks: pk.bonus_picks||{},
     };
   });
+  // Note: pin is NOT loaded into ALL_PLAYERS for security — only checked directly on restore
 }
 
 async function saveMyPicks(){
@@ -702,10 +715,12 @@ function showModalScreen(n){
 async function submitIdentity(){
   const realName = document.getElementById('input-realname').value.trim();
   const teamName = document.getElementById('input-teamname').value.trim();
+  const pin = document.getElementById('input-pin').value.trim();
   const errEl = document.getElementById('modal-error');
   errEl.style.display='none';
   if(!realName){errEl.textContent='Enter your real name.';errEl.style.display='block';return;}
   if(!teamName){errEl.textContent='Enter a team name.';errEl.style.display='block';return;}
+  if(!pin||pin.length!==4||!/^\d{4}$/.test(pin)){errEl.textContent='Enter a 4-digit PIN.';errEl.style.display='block';return;}
 
   // Check if name already taken
   const existing = ALL_PLAYERS.find(p=>p.realName.toLowerCase()===realName.toLowerCase());
@@ -718,7 +733,7 @@ async function submitIdentity(){
   const btn = document.querySelector('#modal-screen-2 .mbtn');
   btn.textContent='Saving...'; btn.disabled=true;
 
-  const {error:insertError} = await sb.from('wc2026_players').insert({real_name:realName,team_name:teamName});
+  const {error:insertError} = await sb.from('wc2026_players').insert({real_name:realName,team_name:teamName,pin:pin});
   if(insertError){
     const msg = 'Error: '+(insertError.message||JSON.stringify(insertError));
     errEl.textContent=msg;errEl.style.display='block';
@@ -750,17 +765,24 @@ async function submitIdentity(){
 
 async function restoreByName(){
   const name = document.getElementById('input-restore').value.trim();
+  const pin = document.getElementById('input-restore-pin').value.trim();
   const errEl = document.getElementById('restore-error');
   errEl.style.display='none';
   if(!name){errEl.textContent='Enter your name.';errEl.style.display='block';return;}
+  if(!pin){errEl.textContent='Enter your PIN.';errEl.style.display='block';return;}
 
-  const match = ALL_PLAYERS.find(p=>p.realName.toLowerCase()===name.toLowerCase());
+  // Fetch player with matching name and pin directly from DB
+  const {data:rows} = await sb.from('wc2026_players').select('*').eq('real_name',name);
+  const match = (rows||[]).find(p=>p.pin===pin);
   if(!match){
-    errEl.textContent='No player found with that name. Check spelling or join as new player.';
+    errEl.textContent='Name or PIN incorrect. Try again.';
     errEl.style.display='block';
     return;
   }
-  ME = {...match};
+  // Load full player data
+  await loadAllPlayers();
+  const player = ALL_PLAYERS.find(p=>p.id===match.id);
+  ME = player ? {...player} : {id:match.id, realName:match.real_name, teamName:match.team_name, groupPicks:{}, koPicks:{}, bonusPicks:{}};
   saveSession(match.id);
   updateHeaderName();
   document.getElementById('modal').style.display='none';
