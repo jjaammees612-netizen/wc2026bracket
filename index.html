@@ -96,11 +96,11 @@ header{border-bottom:1px solid var(--border);padding:16px 24px;display:flex;alig
 .pick-btns{display:flex;gap:5px;margin-top:9px;}
 .pbtn{flex:1;border:none;padding:6px 4px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;letter-spacing:.5px;transition:all .15s;font-family:'DM Sans',sans-serif;}
 .pbtn-w1{background:#1e3a2a;color:#4caf50;border:1px solid #2a5a3a;}
-.pbtn-w1:hover,.pbtn-w1.sel{background:#2a5a3a;color:#a5d6a7;border-color:var(--green);}
+.pbtn-w1:hover,.pbtn-w1.sel{background:#1a5a2a;color:#fff;border-color:var(--green);box-shadow:0 0 0 1px var(--green);}
 .pbtn-draw{background:#2a2a1a;color:#bbb;border:1px solid #3a3a2a;}
-.pbtn-draw:hover,.pbtn-draw.sel{background:#3a3a1a;color:var(--gold);border-color:var(--gold);}
+.pbtn-draw:hover,.pbtn-draw.sel{background:#3a3a00;color:var(--gold);border-color:var(--gold);box-shadow:0 0 0 1px var(--gold);}
 .pbtn-w2{background:#3a1e1e;color:#ef9a9a;border:1px solid #5a2a2a;}
-.pbtn-w2:hover,.pbtn-w2.sel{background:#5a2a2a;color:#ef9a9a;border-color:var(--red);}
+.pbtn-w2:hover,.pbtn-w2.sel{background:#5a1a1a;color:#fff;border-color:var(--red);box-shadow:0 0 0 1px var(--red);}
 
 /* SCORE INPUTS */
 .sinputs{display:flex;gap:6px;margin-top:9px;align-items:center;}
@@ -561,14 +561,14 @@ const SF_PATHS = [
   {id:'SF-2', label:'SF 2 · Jul 15', qfa:'QF-3', qfb:'QF-4'},
 ];
 
-// Flat list still needed for result storage / rendering
+// Flat list for result storage / rendering
 const KNOCKOUT_MATCHES = [
   ...R32_SEEDS.map(s=>({id:s.id,round:'R32',label:s.label,t1:'TBD',t2:'TBD',seedT1:s.seedT1,seedT2:s.seedT2})),
   ...R16_PATHS.map(p=>({id:p.id,round:'R16',label:p.label,t1:'TBD',t2:'TBD',r32a:p.r32a,r32b:p.r32b})),
   ...QF_PATHS.map(p=>({id:p.id,round:'QF',label:p.label,t1:'TBD',t2:'TBD',r16a:p.r16a,r16b:p.r16b})),
   ...SF_PATHS.map(p=>({id:p.id,round:'SF',label:p.label,t1:'TBD',t2:'TBD',qfa:p.qfa,qfb:p.qfb})),
-  {id:'3RD', round:'3RD', label:'🥉 3rd Place · Jul 18', t1:'TBD', t2:'TBD'},
-  {id:'FINAL', round:'FINAL', label:'🏆 THE FINAL · Jul 19', t1:'TBD', t2:'TBD'},
+  {id:'M103', round:'3RD',   label:'🥉 3rd Place · Jul 18', t1:'TBD', t2:'TBD', sfa:'M101', sfb:'M102'},
+  {id:'M104', round:'FINAL', label:'🏆 THE FINAL · Jul 19', t1:'TBD', t2:'TBD', sfa:'M101', sfb:'M102'},
 ];
 
 // ====================================================
@@ -965,14 +965,14 @@ function resolveKOTeams(user){
   });
 
   // Step 6: 3rd place + Final — only if SF winners known
-  const sf1w = advancer('SF-1');
-  const sf2w = advancer('SF-2');
-  const sf1 = teams['SF-1']||{t1:'TBD',t2:'TBD'};
-  const sf2 = teams['SF-2']||{t1:'TBD',t2:'TBD'};
+  const sf1w = advancer('M101');
+  const sf2w = advancer('M102');
+  const sf1 = teams['M101']||{t1:'TBD',t2:'TBD'};
+  const sf2 = teams['M102']||{t1:'TBD',t2:'TBD'};
   const sf1l = sf1w ? (sf1w===sf1.t1 ? sf1.t2 : sf1.t1) : 'TBD';
   const sf2l = sf2w ? (sf2w===sf2.t1 ? sf2.t2 : sf2.t1) : 'TBD';
-  teams['3RD']   = { t1: sf1l, t2: sf2l };
-  teams['FINAL'] = { t1: sf1w||'TBD', t2: sf2w||'TBD' };
+  teams['M103'] = { t1: sf1l, t2: sf2l };
+  teams['M104'] = { t1: sf1w||'TBD', t2: sf2w||'TBD' };
 
   return teams;
 }
@@ -1092,34 +1092,45 @@ function calcScore(user){
 function renderGroups(){
   if(!ME){ document.getElementById('groups-content').innerHTML='<div class="empty"><div class="eicon">👤</div><div class="etext">Sign in to make picks.</div></div>'; return; }
   const locked = isLocked();
-  const html = Object.keys(GROUPS).map(gk=>{
-    const g = GROUPS[gk];
-    const matches = GROUP_MATCHES.filter(m=>m.group===gk);
+
+  // Sort matches chronologically by date
+  const DATE_ORDER = ['Jun 11','Jun 12','Jun 13','Jun 14','Jun 15','Jun 16','Jun 17','Jun 18','Jun 19','Jun 20','Jun 21','Jun 22','Jun 23','Jun 24','Jun 25','Jun 26','Jun 27'];
+  const sorted = [...GROUP_MATCHES].sort((a,b)=>DATE_ORDER.indexOf(a.date)-DATE_ORDER.indexOf(b.date));
+
+  // Group by date
+  const byDate = {};
+  sorted.forEach(m=>{
+    if(!byDate[m.date]) byDate[m.date]=[];
+    byDate[m.date].push(m);
+  });
+
+  // Progress bar
+  const totalPicks = GROUP_MATCHES.length;
+  const madePicks = GROUP_MATCHES.filter(m=>(ME.groupPicks||{})[m.id]).length;
+  const pct = Math.round(madePicks/totalPicks*100);
+  const progressHtml = `
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:16px">
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:12px;color:var(--muted)">Group stage picks</span>
+          <span style="font-size:12px;font-weight:600;color:${pct===100?'var(--green)':'var(--text)'}">${madePicks}/${totalPicks}</span>
+        </div>
+        <div style="background:#222;border-radius:4px;height:6px">
+          <div style="background:${pct===100?'var(--green)':'var(--blue)'};height:6px;border-radius:4px;width:${pct}%;transition:width .3s"></div>
+        </div>
+      </div>
+      <div style="font-size:22px;font-weight:700;color:${pct===100?'var(--green)':'var(--text)'}">${pct}%</div>
+    </div>`;
+
+  const html = DATE_ORDER.filter(d=>byDate[d]).map(date=>{
+    const matches = byDate[date];
     const mhtml = matches.map(m=>renderGroupMatch(m,locked)).join('');
-
-    // Group table based on current user's picks or actual results
-    const standings = computeStandings(ME||null);
-    const rows = standings[gk];
-    const tableHtml = `
-      <div class="gtable" style="margin-bottom:12px">
-        <div class="grow ghead"><div>Team</div><div>W</div><div>D</div><div>L</div><div>GD</div><div>Pts</div></div>
-        ${rows.map((r,i)=>`
-          <div class="grow ${i<2?'gqualify':i===2?'g3rd':''}">
-            <div class="gname"><span>${fl(r.team)}</span>${r.team}</div>
-            <div class="gcell">${r.w}</div>
-            <div class="gcell">${r.d}</div>
-            <div class="gcell">${r.l}</div>
-            <div class="gcell">${r.gd>0?'+'+r.gd:r.gd}</div>
-            <div class="gpts">${r.pts}</div>
-          </div>`).join('')}
-      </div>`;
-
     return `
-      <div class="sec-title">GROUP ${gk} <span class="sec-count">${g.teams.join(' · ')}</span></div>
-      ${tableHtml}
-      <div class="mgrid" style="margin-bottom:28px">${mhtml}</div>`;
+      <div class="sec-title">📅 ${date} <span class="sec-count">${matches.length} match${matches.length>1?'es':''} · Groups ${[...new Set(matches.map(m=>m.group))].join(', ')}</span></div>
+      <div class="mgrid" style="margin-bottom:24px">${mhtml}</div>`;
   }).join('');
-  document.getElementById('groups-content').innerHTML = html;
+
+  document.getElementById('groups-content').innerHTML = progressHtml + html;
 }
 
 function renderGroupMatch(m, locked){
@@ -1172,12 +1183,20 @@ function renderGroupMatch(m, locked){
     : userPick ? `<div style="font-size:9px;color:var(--green);text-align:center;margin-top:3px;letter-spacing:.5px">YOUR PICK ✓</div>`
     : `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.5px">YOUR PICK</div>`;
 
-  return `<div class="mcard">
-    <div class="mlabel"><span>${m.label||'Match'}</span><span class="mdate">${m.date||''}</span>${badge}</div>
+  // Highlight picked team row
+  const pick1highlight = !hasResult && userPick==='w1' ? 'style="background:rgba(0,200,83,.13);border:2px solid var(--green);"' : '';
+  const pick2highlight = !hasResult && userPick==='w2' ? 'style="background:rgba(0,200,83,.13);border:2px solid var(--green);"' : '';
+  const pickDrawHighlight = !hasResult && userPick==='draw' ? 'style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.4);"' : '';
+
+  // Group badge
+  const groupBadge = `<span style="font-size:9px;background:#222;color:var(--muted2);padding:2px 6px;border-radius:4px;letter-spacing:.5px">GRP ${m.group}</span>`;
+
+  return `<div class="mcard" style="${userPick&&!hasResult?'border-color:#2a4a2a;':''}" >
+    <div class="mlabel"><span>${groupBadge} ${m.label||''}</span><span class="mdate">${m.date||''}</span>${badge}</div>
     <div class="mteams">
-      <div class="trow ${w1c}"><div class="tname"><span class="tflag">${fl(m.t1)}</span>${m.t1}</div></div>
-      <div class="vsline">VS</div>
-      <div class="trow ${w2c}"><div class="tname"><span class="tflag">${fl(m.t2)}</span>${m.t2}</div></div>
+      <div class="trow ${w1c}" ${pick1highlight}><div class="tname"><span class="tflag">${fl(m.t1)}</span>${m.t1}</div>${!hasResult&&userPick==='w1'?'<span style="font-size:10px;color:var(--green);font-weight:700;margin-left:4px">✓ YOUR PICK</span>':''}</div>
+      <div class="vsline" ${pickDrawHighlight}>${!hasResult&&userPick==='draw'?'<span style="color:var(--gold);font-weight:700;font-size:10px">✓ YOUR PICK: DRAW</span>':'VS'}</div>
+      <div class="trow ${w2c}" ${pick2highlight}><div class="tname"><span class="tflag">${fl(m.t2)}</span>${m.t2}</div>${!hasResult&&userPick==='w2'?'<span style="font-size:10px;color:var(--green);font-weight:700;margin-left:4px">✓ YOUR PICK</span>':''}</div>
     </div>
     ${bottomRow}
     ${rowLabel}
@@ -1234,7 +1253,7 @@ function setKOResult(matchId, t1, t2, outcome){
 // ====================================================
 function renderKnockout(){
   const rounds = ['R32','R16','QF','SF','3RD','FINAL'];
-  const labels = {R32:'ROUND OF 32',R16:'ROUND OF 16',QF:'QUARTER FINALS',SF:'SEMI FINALS','3RD':'🥉 THIRD PLACE','FINAL':'🏆 THE FINAL'};
+  const labels = {R32:'ROUND OF 32',R16:'ROUND OF 16',QF:'QUARTER FINALS',SF:'SEMI FINALS','3RD':'🥉 THIRD PLACE',FINAL:'🏆 THE FINAL'};
   // Resolve teams for current user's predicted bracket
   const resolvedTeams = ME ? resolveKOTeams(ME.realName) : {};
   const html = rounds.map(r=>{
