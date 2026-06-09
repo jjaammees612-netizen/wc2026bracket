@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230d1117'/><text y='.9em' font-size='80' x='50%' text-anchor='middle'>⚽</text></svg>">
 <title>WC 2026 Bracket Battle</title>
-<link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;WC2026 Bracket Battle&quot;,&quot;short_name&quot;:&quot;WC2026&quot;,&quot;start_url&quot;:&quot;/&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;%230d1117&quot;,&quot;theme_color&quot;:&quot;%230d1117&quot;,&quot;icons&quot;:[{&quot;src&quot;:&quot;data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230d1117'/><text y='.9em' font-size='80' x='50%25' text-anchor='middle'>⚽</text></svg>&quot;,&quot;sizes&quot;:&quot;any&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;}]}">
+<link rel="manifest" href="/manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 
 <style>
@@ -860,7 +860,8 @@ function computeStandings(user){
         else{table[m.t1].pts+=1;table[m.t1].d++;table[m.t2].pts+=1;table[m.t2].d++;}
       } else if(user){
         // Use user's pick
-        const player = ALL_PLAYERS.find(p=>p.realName===user||p.id===user)||{};
+        const playerName = typeof user === 'object' ? user?.realName : user;
+        const player = ALL_PLAYERS.find(p=>p.realName===playerName||p.id===playerName)||ME||{};
         const pick = (player.groupPicks||{})[m.id];
         if(pick==='w1'){table[m.t1].pts+=3;table[m.t1].w++;table[m.t2].l++;}
         else if(pick==='w2'){table[m.t2].pts+=3;table[m.t2].w++;table[m.t1].l++;}
@@ -888,7 +889,8 @@ function resolveTeam(seed, standings, user, adminOverrides){
     // Only resolve if user has picked all 3 matches in this group
     // (if actual results exist for all 3, those count too)
     const groupMatchIds = GROUP_MATCHES.filter(m=>m.group===gk).map(m=>m.id);
-    const playerObj = ALL_PLAYERS.find(p=>p.realName===user||p.id===user)||ME||{};
+    const _uname = typeof user==='object'?user?.realName:user;
+  const playerObj = ALL_PLAYERS.find(p=>p.realName===_uname||p.id===_uname)||ME||{};
     const gp = playerObj.groupPicks||{};
     const allPicked = groupMatchIds.every(id => ST.results[id]!==undefined || gp[id]);
     if(!allPicked) return 'TBD';
@@ -900,7 +902,8 @@ function resolveTeam(seed, standings, user, adminOverrides){
   }
   // 3rd place: use user's personal ranking to pick best from listed groups
   // userRanking is ordered list of group keys [A,B,C,...] — top 8 qualify
-  const playerObj2 = ALL_PLAYERS.find(p=>p.realName===user||p.id===user)||ME||{};
+  const _uname2 = typeof user==='object'?user?.realName:user;
+  const playerObj2 = ALL_PLAYERS.find(p=>p.realName===_uname2||p.id===_uname2)||ME||{};
   const userRanking = (playerObj2.bonusPicks||{}).thirdRanking || [];
   // If user hasn't explicitly set their 3rd place ranking, return TBD
   if(userRanking.length === 0) return 'TBD';
@@ -998,7 +1001,8 @@ function getMatchdays(){
 
 function checkPerfectMatchdays(user){
   // Returns count of perfect matchdays for user
-  const playerPM = ALL_PLAYERS.find(p=>p.realName===user||p.id===user)||ME||{};
+  const _unamePM = typeof user==='object'?user?.realName:user;
+  const playerPM = ALL_PLAYERS.find(p=>p.realName===_unamePM||p.id===_unamePM)||ME||{};
   const gp = playerPM.groupPicks||{};
   const days = getMatchdays();
   let perfect = 0;
@@ -1082,7 +1086,7 @@ function calcScore(user){
   }
 
   // Perfect matchday bonuses — +3pts each
-  const perfectDays = checkPerfectMatchdays(user);
+  const perfectDays = checkPerfectMatchdays(user);  // user is already a realName string here
   pts += perfectDays * 3;
 
   // Perfect group bonuses — +3pts each
@@ -1194,8 +1198,8 @@ function renderGroupMatch(m, locked){
     : userPick ? `<span class="badge bdone">✓</span>`
     : `<span class="badge bup">Pick</span>`;
 
-  const hint = !hasResult && !locked && !userPick
-    ? `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:5px">tap team · tap VS for draw</div>`
+  const hint = !hasResult && !locked
+    ? `<div style="font-size:9px;color:var(--muted2);text-align:center;margin-top:5px;letter-spacing:.3px">tap team to pick · tap <strong style="color:var(--muted)">VS</strong> for draw</div>`
     : '';
 
   const grpbadge = `<span style="font-size:9px;background:rgba(255,255,255,.06);color:var(--muted2);padding:2px 6px;border-radius:4px;font-weight:600">GRP ${m.group}</span>`;
@@ -1574,7 +1578,7 @@ function renderThirdRankList(){
   ranking = ranking.filter(g=>allGroups.includes(g));
   ME.bonusPicks.thirdRanking = ranking;
 
-  const standings = computeStandings(ME);
+  const standings = computeStandings(ME?ME.realName:null);
 
   el.innerHTML = ranking.map((gk,i)=>{
     const st = standings[gk];
