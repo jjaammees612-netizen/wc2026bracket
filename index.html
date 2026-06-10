@@ -540,7 +540,7 @@ const R32_SEEDS = [
   {id:'M81', label:'M81 · Jul 1',  seedT1:'1D', seedT2:'3B'},   // SF Bay
   {id:'M82', label:'M82 · Jul 1',  seedT1:'1G', seedT2:'3A'},   // Seattle
   {id:'M83', label:'M83 · Jul 1',  seedT1:'2K', seedT2:'2L'},   // Toronto
-  {id:'M84', label:'M84 · Jul 2',  seedT1:'1H', seedT2:'3J'},   // LA
+  {id:'M84', label:'M84 · Jul 2',  seedT1:'1H', seedT2:'2J'},   // LA: Spain vs Austria(2J)
   {id:'M85', label:'M85 · Jul 2',  seedT1:'1B', seedT2:'3J'},   // Vancouver -- note both M84/M85 use 3J; FIFA assigns based on which groups actually produce 3rd placers
   {id:'M86', label:'M86 · Jul 3',  seedT1:'1J', seedT2:'2H'},   // Miami
   {id:'M87', label:'M87 · Jul 3',  seedT1:'2D', seedT2:'2G'},   // Dallas
@@ -870,16 +870,16 @@ function computeStandings(user){
         else if(pick==='draw'){table[m.t1].pts+=1;table[m.t1].d++;table[m.t2].pts+=1;table[m.t2].d++;}
       }
     });
-    // Sort by pts, then respect user's tiebreak order if set
+    // Sort by pts desc, then wins desc, then user tiebreak for equal pts+wins
     const userOrders = (ME&&ME.bonusPicks&&ME.bonusPicks.groupOrders)||{};
     const orderFor = userOrders[gk]||[];
     standings[gk] = Object.values(table).sort((a,b)=>{
-      if(b.pts!==a.pts) return b.pts-a.pts;
-      if(b.w!==a.w) return b.w-a.w;
-      // Same pts and wins — use user's tiebreak order
+      if(b.pts!==a.pts) return b.pts-a.pts; // different pts — strict order, ignore tiebreak
+      if(b.w!==a.w) return b.w-a.w;         // different wins — strict order
+      // Only use tiebreak when pts AND wins are equal
       const ai = orderFor.indexOf(a.team), bi = orderFor.indexOf(b.team);
       if(ai>=0&&bi>=0) return ai-bi;
-      return 0;
+      return a.team.localeCompare(b.team);   // fallback alphabetical
     });
   }
   return standings;
