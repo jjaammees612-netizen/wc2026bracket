@@ -912,36 +912,31 @@ function resolveTeam(seed, standings, user, adminOverrides){
     const team = st[rank-1];
     return team ? team.team : 'TBD';
   }
-  // 3rd place: if single group (e.g. '3C'), just get that group's 3rd place team
-  // if multi-group (e.g. '3ABCDF'), use user ranking to pick best
-  if(groups.length === 1){
-    const gk = groups[0];
-    const st = standings[gk];
-    if(!st || !st[2]) return 'TBD';
-    // Check if all matches in this group are picked
-    const groupMatchIds = GROUP_MATCHES.filter(m=>m.group===gk).map(m=>m.id);
-    const _gp = (ME && ME.realName===(typeof user==='object'?user?.realName:user)) ? ME.groupPicks : (ALL_PLAYERS.find(p=>p.realName===(typeof user==='object'?user?.realName:user))||{}).groupPicks||{};
-    const allPicked = groupMatchIds.every(id => ST.results[id]!==undefined || (_gp||{})[id]);
-    if(!allPicked) return 'TBD';
-    return st[2].team;
-  }
-  // 3rd place: use user's personal ranking to pick best from listed groups
-  // userRanking is ordered list of group keys [A,B,C,...] — top 8 qualify
+  // 3rd place: use user's ranking to pick which qualifying 3rd place team fills this slot
+  // This mirrors FIFA Annex C: each slot has eligible groups, pick highest-ranked qualifying one
   const _uname2 = typeof user==='object'?user?.realName:user;
   const bonusSource = (ME && ME.realName===_uname2) ? ME.bonusPicks : (ALL_PLAYERS.find(p=>p.realName===_uname2||p.id===_uname2)||{}).bonusPicks||{};
   const userRanking = (bonusSource||{}).thirdRanking || Object.keys(GROUPS);
-  // If no ranking set at all, TBD
-  if(userRanking.length === 0) return 'TBD';
+
+  // Top 8 in ranking qualify
   const qualifiedGroups = new Set(userRanking.slice(0,8));
 
+  // Filter to groups eligible for this slot AND qualified in top 8
   const candidateGroups = groups.filter(gk => qualifiedGroups.has(gk));
   if(candidateGroups.length === 0) return 'TBD';
 
-  // Pick the highest-ranked one per user's ranking
+  // Pick the highest-ranked eligible group from user's ranking
   candidateGroups.sort((a,b) => userRanking.indexOf(a) - userRanking.indexOf(b));
   const bestGroup = candidateGroups[0];
   const st = standings[bestGroup];
   if(!st || !st[2]) return 'TBD';
+
+  // Check all matches in this group are picked before resolving
+  const gMatchIds = GROUP_MATCHES.filter(m=>m.group===bestGroup).map(m=>m.id);
+  const bgp = (ME && ME.realName===_uname2) ? (ME.groupPicks||{}) : (ALL_PLAYERS.find(p=>p.realName===_uname2)||{}).groupPicks||{};
+  const allPicked = gMatchIds.every(id => ST.results[id]!==undefined || bgp[id]);
+  if(!allPicked) return 'TBD';
+
   return st[2].team;
 }
 
@@ -954,11 +949,21 @@ function resolveKOTeams(user){
   const kp = playerObj.koPicks||{};
   const res = ST.results;
 
-  // Step 1: R32 — teams come from group standings
+  // Step 1: R32 — t1 from group standings, t2 either from standings or user's 3rd place pick
+  const bonusPk = (ME&&ME.realName===user) ? ME.bonusPicks : (ALL_PLAYERS.find(p=>p.realName===user)||{}).bonusPicks||{};
+  const thirdPicks = bonusPk?.thirdMatchPicks||{};
+
   KNOCKOUT_MATCHES.filter(m=>m.round==='R32').forEach(m=>{
+    let t2;
+    if(m.seedT2 && m.seedT2.startsWith('3') && m.seedT2.length > 2){
+      // Multi-group 3rd place slot — use user's explicit pick if set
+      t2 = thirdPicks[m.id] || resolveTeam(m.seedT2, standings, user, overrides);
+    } else {
+      t2 = resolveTeam(m.seedT2, standings, user, overrides);
+    }
     teams[m.id] = {
       t1: resolveTeam(m.seedT1, standings, user, overrides),
-      t2: resolveTeam(m.seedT2, standings, user, overrides),
+      t2,
     };
   });
 
@@ -1246,6 +1251,23 @@ function groupPick(matchId, pick){
 // ====================================================
 let _groupDragging = null;
 
+
+function thirdMatchPick(matchId, team){
+  if(!ME){showToast('Sign in first');return;}
+  if(isLocked()){showToast('🔒 Picks are locked!');return;}
+  if(!ME.bonusPicks) ME.bonusPicks={};
+  if(!ME.bonusPicks.thirdMatchPicks) ME.bonusPicks.thirdMatchPicks={};
+  if(ME.bonusPicks.thirdMatchPicks[matchId]===team){
+    delete ME.bonusPicks.thirdMatchPicks[matchId];
+    showToast('Pick removed');
+  } else {
+    ME.bonusPicks.thirdMatchPicks[matchId]=team;
+    showToast(`${fl(team)} ${team} picked for this slot!`);
+  }
+  saveMyPicks();
+  renderKnockout();
+}
+
 function groupRowDragStart(e){
   _groupDragging = e.currentTarget;
   setTimeout(()=>_groupDragging.style.opacity='.4', 0);
@@ -1387,12 +1409,13 @@ function renderKOMatch(m){
 
   if(isTBD){
     return `<div class="mcard" style="opacity:.5">
-      <div class="mlabel"><span>${m.label}</span><span class="badge bup">TBD</span></div>
+      <div class="mlabel"><span style="font-size:9px;color:var(--muted2)">${m.label}</span><span class="badge bup">TBD</span></div>
       <div class="mteams">
         <div class="trow" style="cursor:default"><div class="tname"><span class="tflag">🏳️</span>TBD</div></div>
         <div class="vsline">VS</div>
         <div class="trow" style="cursor:default"><div class="tname"><span class="tflag">🏳️</span>TBD</div></div>
       </div>
+      <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:5px">Rank 3rd place teams in Groups tab to populate</div>
     </div>`;
   }
 
