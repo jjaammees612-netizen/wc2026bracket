@@ -1806,7 +1806,7 @@ function setBonusPick(type, val){
   if(isLocked()){showToast('🔒 Picks are locked!');return;}
   if(!ME.bonusPicks) ME.bonusPicks={};
   ME.bonusPicks[type]=val;
-  
+  saveMyPicks();
   const label = type==='champion'?`${fl(val)} ${val}`:val;
   showToast(`${type==='champion'?'🏆':'⚽'} ${label} picked!`);
   renderBonus();
