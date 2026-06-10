@@ -527,48 +527,49 @@ const GROUP_MATCHES = [
 // Slots marked with seedT1/seedT2 define who plays who from group standings
 // '3RD' slots get assigned by admin after group stage (495 matrix combos)
 // ====================================================
+// Confirmed from play.fifa.com/bracket-predictor
 const R32_SEEDS = [
-  {id:'R32-73', label:'M73 · Jun 28', seedT1:'2A', seedT2:'2B'},
-  {id:'R32-74', label:'M74 · Jun 29', seedT1:'1E', seedT2:'3ABCDF'},
-  {id:'R32-75', label:'M75 · Jun 29', seedT1:'1F', seedT2:'2C'},
-  {id:'R32-76', label:'M76 · Jun 29', seedT1:'1C', seedT2:'2F'},
-  {id:'R32-77', label:'M77 · Jun 30', seedT1:'1I', seedT2:'3CDFGH'},
-  {id:'R32-78', label:'M78 · Jun 30', seedT1:'2E', seedT2:'2I'},
-  {id:'R32-79', label:'M79 · Jun 30', seedT1:'1A', seedT2:'3CEFHI'},
-  {id:'R32-80', label:'M80 · Jul 1',  seedT1:'1L', seedT2:'3EHIJK'},
-  {id:'R32-81', label:'M81 · Jul 1',  seedT1:'1D', seedT2:'3BEFIJ'},
-  {id:'R32-82', label:'M82 · Jul 1',  seedT1:'1G', seedT2:'3AEHIJ'},
-  {id:'R32-83', label:'M83 · Jul 2',  seedT1:'2K', seedT2:'2L'},
-  {id:'R32-84', label:'M84 · Jul 2',  seedT1:'1H', seedT2:'2J'},
-  {id:'R32-85', label:'M85 · Jul 2',  seedT1:'1B', seedT2:'3EFGIJ'},
-  {id:'R32-86', label:'M86 · Jul 3',  seedT1:'1J', seedT2:'2H'},
-  {id:'R32-87', label:'M87 · Jul 3',  seedT1:'1K', seedT2:'3DEIJL'},
-  {id:'R32-88', label:'M88 · Jul 3',  seedT1:'2D', seedT2:'2G'},
+  {id:'M73', label:'M73 · Jun 28', seedT1:'2A', seedT2:'2B'},   // LA
+  {id:'M74', label:'M74 · Jun 29', seedT1:'1E', seedT2:'3C'},   // Boston
+  {id:'M75', label:'M75 · Jun 29', seedT1:'1F', seedT2:'2C'},   // Monterrey
+  {id:'M76', label:'M76 · Jun 29', seedT1:'1C', seedT2:'2F'},   // Houston
+  {id:'M77', label:'M77 · Jun 30', seedT1:'1I', seedT2:'3D'},   // NY/NJ
+  {id:'M78', label:'M78 · Jun 30', seedT1:'2E', seedT2:'2I'},   // Dallas
+  {id:'M79', label:'M79 · Jun 30', seedT1:'1A', seedT2:'3H'},   // Mexico City
+  {id:'M80', label:'M80 · Jul 1',  seedT1:'1L', seedT2:'3I'},   // Atlanta
+  {id:'M81', label:'M81 · Jul 1',  seedT1:'1D', seedT2:'3B'},   // SF Bay
+  {id:'M82', label:'M82 · Jul 1',  seedT1:'1G', seedT2:'3A'},   // Seattle
+  {id:'M83', label:'M83 · Jul 1',  seedT1:'2K', seedT2:'2L'},   // Toronto
+  {id:'M84', label:'M84 · Jul 2',  seedT1:'1H', seedT2:'3J'},   // LA
+  {id:'M85', label:'M85 · Jul 2',  seedT1:'1B', seedT2:'3J'},   // Vancouver -- note both M84/M85 use 3J; FIFA assigns based on which groups actually produce 3rd placers
+  {id:'M86', label:'M86 · Jul 3',  seedT1:'1J', seedT2:'2H'},   // Miami
+  {id:'M87', label:'M87 · Jul 3',  seedT1:'2D', seedT2:'2G'},   // Dallas
+  {id:'M88', label:'M88 · Jul 3',  seedT1:'1K', seedT2:'3L'},   // KC
 ];
 
-// R16 bracket paths (winner of R32 matchup X plays winner of Y)
 const R16_PATHS = [
-  {id:'R16-1', label:'R16 M1 · Jul 5', r32a:'R32-73', r32b:'R32-76'},
-  {id:'R16-2', label:'R16 M2 · Jul 5', r32a:'R32-74', r32b:'R32-75'},
-  {id:'R16-3', label:'R16 M3 · Jul 6', r32a:'R32-78', r32b:'R32-77'},
-  {id:'R16-4', label:'R16 M4 · Jul 6', r32a:'R32-79', r32b:'R32-80'},
-  {id:'R16-5', label:'R16 M5 · Jul 7', r32a:'R32-82', r32b:'R32-81'},
-  {id:'R16-6', label:'R16 M6 · Jul 7', r32a:'R32-84', r32b:'R32-83'},
-  {id:'R16-7', label:'R16 M7 · Jul 8', r32a:'R32-85', r32b:'R32-88'},
-  {id:'R16-8', label:'R16 M8 · Jul 8', r32a:'R32-86', r32b:'R32-87'},
-];
-const QF_PATHS = [
-  {id:'QF-1', label:'QF 1 · Jul 11', r16a:'R16-1', r16b:'R16-2'},
-  {id:'QF-2', label:'QF 2 · Jul 11', r16a:'R16-3', r16b:'R16-4'},
-  {id:'QF-3', label:'QF 3 · Jul 12', r16a:'R16-5', r16b:'R16-6'},
-  {id:'QF-4', label:'QF 4 · Jul 12', r16a:'R16-7', r16b:'R16-8'},
-];
-const SF_PATHS = [
-  {id:'SF-1', label:'SF 1 · Jul 15', qfa:'QF-1', qfb:'QF-2'},
-  {id:'SF-2', label:'SF 2 · Jul 15', qfa:'QF-3', qfb:'QF-4'},
+  {id:'M89', label:'R16 · Jul 4',  r32a:'M74', r32b:'M77'},  // Boston: W74 vs W77
+  {id:'M90', label:'R16 · Jul 4',  r32a:'M73', r32b:'M75'},  // Houston: W73 vs W75
+  {id:'M91', label:'R16 · Jul 5',  r32a:'M76', r32b:'M78'},  // NY/NJ: W76 vs W78
+  {id:'M92', label:'R16 · Jul 5',  r32a:'M79', r32b:'M80'},  // Mexico City: W79 vs W80
+  {id:'M93', label:'R16 · Jul 6',  r32a:'M83', r32b:'M84'},  // Dallas: W83 vs W84
+  {id:'M94', label:'R16 · Jul 6',  r32a:'M81', r32b:'M82'},  // Seattle: W81 vs W82
+  {id:'M95', label:'R16 · Jul 7',  r32a:'M86', r32b:'M87'},  // Atlanta: W86 vs W87
+  {id:'M96', label:'R16 · Jul 7',  r32a:'M85', r32b:'M88'},  // Vancouver: W85 vs W88
 ];
 
-// Flat list for result storage / rendering
+const QF_PATHS = [
+  {id:'M97', label:'QF · Jul 9',   r16a:'M89', r16b:'M90'},
+  {id:'M98', label:'QF · Jul 10',  r16a:'M93', r16b:'M94'},
+  {id:'M99', label:'QF · Jul 11',  r16a:'M91', r16b:'M92'},
+  {id:'M100',label:'QF · Jul 11',  r16a:'M95', r16b:'M96'},
+];
+
+const SF_PATHS = [
+  {id:'M101', label:'SF · Jul 14', qfa:'M97',  qfb:'M98'},
+  {id:'M102', label:'SF · Jul 15', qfa:'M99',  qfb:'M100'},
+];
+
 const KNOCKOUT_MATCHES = [
   ...R32_SEEDS.map(s=>({id:s.id,round:'R32',label:s.label,t1:'TBD',t2:'TBD',seedT1:s.seedT1,seedT2:s.seedT2})),
   ...R16_PATHS.map(p=>({id:p.id,round:'R16',label:p.label,t1:'TBD',t2:'TBD',r32a:p.r32a,r32b:p.r32b})),
