@@ -771,7 +771,7 @@ async function submitIdentity(){
 
   ME = {id:newPlayer.id, realName:newPlayer.realName, teamName:newPlayer.teamName, groupPicks:{}, koPicks:{}, bonusPicks:{}};
   ALL_PLAYERS.push({...ME});
-  saveSession(data.id);
+  saveSession(newPlayer.id);
   updateHeaderName();
   document.getElementById('modal').style.display='none';
   if(isLocked()) document.getElementById('lockbanner').style.display='block';
@@ -861,8 +861,9 @@ function computeStandings(user){
       } else if(user){
         // Use user's pick
         const playerName = typeof user === 'object' ? user?.realName : user;
-        const player = ALL_PLAYERS.find(p=>p.realName===playerName||p.id===playerName)||ME||{};
-        const pick = (player.groupPicks||{})[m.id];
+        // Use ME.groupPicks directly if current user for freshest data
+        const gpSource = (ME && ME.realName===playerName) ? ME.groupPicks : (ALL_PLAYERS.find(p=>p.realName===playerName||p.id===playerName)||{}).groupPicks||{};
+        const pick = (gpSource||{})[m.id];
         if(pick==='w1'){table[m.t1].pts+=3;table[m.t1].w++;table[m.t2].l++;}
         else if(pick==='w2'){table[m.t2].pts+=3;table[m.t2].w++;table[m.t1].l++;}
         else if(pick==='draw'){table[m.t1].pts+=1;table[m.t1].d++;table[m.t2].pts+=1;table[m.t2].d++;}
@@ -890,8 +891,8 @@ function resolveTeam(seed, standings, user, adminOverrides){
     // (if actual results exist for all 3, those count too)
     const groupMatchIds = GROUP_MATCHES.filter(m=>m.group===gk).map(m=>m.id);
     const _uname = typeof user==='object'?user?.realName:user;
-  const playerObj = ALL_PLAYERS.find(p=>p.realName===_uname||p.id===_uname)||ME||{};
-    const gp = playerObj.groupPicks||{};
+    // Use ME.groupPicks directly if this is the current user (most up-to-date)
+    const gp = (ME && ME.realName===_uname) ? (ME.groupPicks||{}) : (ALL_PLAYERS.find(p=>p.realName===_uname||p.id===_uname)||{}).groupPicks||{};
     const allPicked = groupMatchIds.every(id => ST.results[id]!==undefined || gp[id]);
     if(!allPicked) return 'TBD';
     // check tiebreak overrides
@@ -903,9 +904,9 @@ function resolveTeam(seed, standings, user, adminOverrides){
   // 3rd place: use user's personal ranking to pick best from listed groups
   // userRanking is ordered list of group keys [A,B,C,...] — top 8 qualify
   const _uname2 = typeof user==='object'?user?.realName:user;
-  const playerObj2 = ALL_PLAYERS.find(p=>p.realName===_uname2||p.id===_uname2)||ME||{};
-  const userRanking = (playerObj2.bonusPicks||{}).thirdRanking || [];
-  // If user hasn't explicitly set their 3rd place ranking, return TBD
+  const bonusSource = (ME && ME.realName===_uname2) ? ME.bonusPicks : (ALL_PLAYERS.find(p=>p.realName===_uname2||p.id===_uname2)||{}).bonusPicks||{};
+  const userRanking = (bonusSource||{}).thirdRanking || Object.keys(GROUPS);
+  // If no ranking set at all, TBD
   if(userRanking.length === 0) return 'TBD';
   const qualifiedGroups = new Set(userRanking.slice(0,8));
 
@@ -1075,7 +1076,7 @@ function calcScore(user){
   if(bp.champion) picks++;
   if(ST.actualChampion && bp.champion){
     judged++;
-    if(ST.actualChampion===bp.champion){correct++;pts+=25;}
+    if(ST.actualChampion===bp.champion){correct++;pts+=15;}
   }
 
   // Top scorer pick — 5pts
@@ -1513,7 +1514,7 @@ function renderBonus(){
           <span>Knockout correct</span><span style="color:var(--text);font-weight:600">+2 pts</span>
           <span>Perfect matchday</span><span style="color:var(--gold);font-weight:600">+3 pts</span>
           <span>Perfect group table</span><span style="color:var(--gold);font-weight:600">+3 pts</span>
-          <span>Champion pick</span><span style="color:var(--gold);font-weight:600">+25 pts</span>
+          <span>Champion pick</span><span style="color:var(--gold);font-weight:600">+15 pts</span>
           <span>Golden Boot pick</span><span style="color:var(--gold);font-weight:600">+10 pts</span>
         </div>
       </div>
@@ -1531,7 +1532,7 @@ function renderBonus(){
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
           <div>
             <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px">🏆 WORLD CUP CHAMPION</div>
-            <div style="font-size:12px;color:var(--muted);margin-top:2px">Worth <strong style="color:var(--gold)">+25 pts</strong> if correct</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">Worth <strong style="color:var(--gold)">+15 pts</strong> if correct</div>
           </div>
           ${champStatus}
         </div>
@@ -1571,7 +1572,10 @@ function renderThirdRankList(){
   if(!el) return;
   const locked = isLocked();
   if(!ME.bonusPicks) ME.bonusPicks={};
-  let ranking = ME.bonusPicks.thirdRanking || [];
+  // Default ranking alphabetically if not set — user can drag to reorder
+  let ranking = (ME.bonusPicks.thirdRanking && ME.bonusPicks.thirdRanking.length > 0) 
+    ? ME.bonusPicks.thirdRanking 
+    : Object.keys(GROUPS);
   // Make sure all 12 groups are present
   const allGroups = Object.keys(GROUPS);
   allGroups.forEach(g=>{ if(!ranking.includes(g)) ranking.push(g); });
