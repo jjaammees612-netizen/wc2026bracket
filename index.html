@@ -869,7 +869,17 @@ function computeStandings(user){
         else if(pick==='draw'){table[m.t1].pts+=1;table[m.t1].d++;table[m.t2].pts+=1;table[m.t2].d++;}
       }
     });
-    standings[gk] = Object.values(table).sort((a,b)=>b.pts-a.pts||b.w-a.w);
+    // Sort by pts, then respect user's tiebreak order if set
+    const userOrders = (ME&&ME.bonusPicks&&ME.bonusPicks.groupOrders)||{};
+    const orderFor = userOrders[gk]||[];
+    standings[gk] = Object.values(table).sort((a,b)=>{
+      if(b.pts!==a.pts) return b.pts-a.pts;
+      if(b.w!==a.w) return b.w-a.w;
+      // Same pts and wins — use user's tiebreak order
+      const ai = orderFor.indexOf(a.team), bi = orderFor.indexOf(b.team);
+      if(ai>=0&&bi>=0) return ai-bi;
+      return 0;
+    });
   }
   return standings;
 }
@@ -1147,6 +1157,14 @@ function renderGroups(){
       <div style="font-size:22px;font-weight:700;color:${pct===100?'var(--green)':'var(--text)'}">${pct}%</div>
     </div>`;
 
+  const instructions = `
+    <div style="background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#93c5fd;line-height:1.8">
+      <strong style="color:var(--text)">How to fill your bracket:</strong><br>
+      1️⃣ Tap a team to pick them as winner · tap <strong>VS</strong> to pick a draw<br>
+      2️⃣ Scroll down to <strong>Predicted Standings</strong> — if two teams are tied on points, drag the <strong>⠿</strong> handle to set your tiebreak<br>
+      3️⃣ Scroll to <strong>3rd Place Ranking</strong> — drag to rank which 8 third-place teams you think qualify (same points = drag to reorder)
+    </div>`;
+
   const html = DATE_ORDER.filter(d=>byDate[d]).map(date=>{
     const matches = byDate[date];
     const mhtml = matches.map(m=>renderGroupMatch(m,locked)).join('');
@@ -1169,16 +1187,30 @@ function renderGroups(){
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-bottom:24px">
       ${Object.keys(GROUPS).map(gk=>{
         const rows = standings[gk]||[];
-        return `<div class="gtable">
-          <div class="grow ghead" style="grid-template-columns:1fr 28px 28px 28px 36px"><div>Group ${gk}</div><div>W</div><div>D</div><div>L</div><div>Pts</div></div>
-          ${rows.map((r,i)=>`
-            <div class="grow ${i<2?'gqualify':i===2?'g3rd':''}" style="grid-template-columns:1fr 28px 28px 28px 36px">
+        // Check if any adjacent teams are tied on pts — those rows get drag handles
+        return `<div class="gtable" id="group-table-${gk}">
+          <div class="grow ghead" style="grid-template-columns:16px 1fr 28px 28px 28px 36px">
+            <div></div><div>Group ${gk}</div><div>W</div><div>D</div><div>L</div><div>Pts</div>
+          </div>
+          ${rows.map((r,i)=>{
+            const prevPts = i>0?rows[i-1].pts:-1;
+            const nextPts = i<rows.length-1?rows[i+1].pts:-1;
+            const isTied = r.pts===prevPts||r.pts===nextPts;
+            return `<div class="grow group-row ${i<2?'gqualify':i===2?'g3rd':''}"
+              style="grid-template-columns:16px 1fr 28px 28px 28px 36px;cursor:${isTied?'grab':'default'}"
+              data-group="${gk}" data-team="${r.team}" data-pts="${r.pts}"
+              draggable="${isTied&&!locked}"
+              ondragstart="groupRowDragStart(event)"
+              ondragover="groupRowDragOver(event)"
+              ondragend="groupRowDragEnd(event,'${gk}')">
+              <div style="color:var(--muted);font-size:12px">${isTied?'⠿':''}</div>
               <div class="gname"><span>${fl(r.team)}</span><span style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.team}</span></div>
               <div class="gcell">${r.w}</div>
               <div class="gcell">${r.d}</div>
               <div class="gcell">${r.l}</div>
               <div class="gpts" style="color:var(--green);font-size:14px">${r.pts}</div>
-            </div>`).join('')}
+            </div>`;
+          }).join('')}
         </div>`;
       }).join('')}
     </div>
@@ -1187,7 +1219,7 @@ function renderGroups(){
       <span><span style="display:inline-block;width:8px;height:8px;background:var(--gold);border-radius:2px;margin-right:4px"></span>3rd place bubble</span>
     </div>`;
 
-  document.getElementById('groups-content').innerHTML = progressHtml + html + standingsHtml + thirdRankSection;
+  document.getElementById('groups-content').innerHTML = progressHtml + instructions + html + standingsHtml + thirdRankSection;
   renderThirdRankList();
 }
 
@@ -1204,6 +1236,49 @@ function groupPick(matchId, pick){
     showToast(`Picked: ${label}`);
   }
   saveMyPicks();
+  renderGroups();
+}
+
+
+// ====================================================
+// GROUP TABLE TIEBREAK DRAG
+// ====================================================
+let _groupDragging = null;
+
+function groupRowDragStart(e){
+  _groupDragging = e.currentTarget;
+  setTimeout(()=>_groupDragging.style.opacity='.4', 0);
+}
+
+function groupRowDragOver(e){
+  e.preventDefault();
+  if(!_groupDragging || _groupDragging===e.currentTarget) return;
+  // Only allow swap within same group and same pts tier
+  if(_groupDragging.dataset.group !== e.currentTarget.dataset.group) return;
+  if(_groupDragging.dataset.pts !== e.currentTarget.dataset.pts) return;
+  const table = e.currentTarget.closest('.gtable');
+  const rect = e.currentTarget.getBoundingClientRect();
+  if(e.clientY < rect.top + rect.height/2){
+    table.insertBefore(_groupDragging, e.currentTarget);
+  } else {
+    table.insertBefore(_groupDragging, e.currentTarget.nextSibling);
+  }
+}
+
+function groupRowDragEnd(e, gk){
+  if(_groupDragging) _groupDragging.style.opacity='1';
+  _groupDragging = null;
+  // Save new order as tiebreak override
+  const table = document.getElementById('group-table-'+gk);
+  if(!table) return;
+  const rows = [...table.querySelectorAll('.group-row')];
+  const order = rows.map(r=>r.dataset.team);
+  if(!ME.bonusPicks) ME.bonusPicks={};
+  if(!ME.bonusPicks.groupOrders) ME.bonusPicks.groupOrders={};
+  ME.bonusPicks.groupOrders[gk] = order;
+  saveMyPicks();
+  showToast(`Group ${gk} order saved`);
+  // Re-render to update bracket
   renderGroups();
 }
 
