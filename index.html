@@ -901,6 +901,19 @@ function resolveTeam(seed, standings, user, adminOverrides){
     const team = st[rank-1];
     return team ? team.team : 'TBD';
   }
+  // 3rd place: if single group (e.g. '3C'), just get that group's 3rd place team
+  // if multi-group (e.g. '3ABCDF'), use user ranking to pick best
+  if(groups.length === 1){
+    const gk = groups[0];
+    const st = standings[gk];
+    if(!st || !st[2]) return 'TBD';
+    // Check if all matches in this group are picked
+    const groupMatchIds = GROUP_MATCHES.filter(m=>m.group===gk).map(m=>m.id);
+    const _gp = (ME && ME.realName===(typeof user==='object'?user?.realName:user)) ? ME.groupPicks : (ALL_PLAYERS.find(p=>p.realName===(typeof user==='object'?user?.realName:user))||{}).groupPicks||{};
+    const allPicked = groupMatchIds.every(id => ST.results[id]!==undefined || (_gp||{})[id]);
+    if(!allPicked) return 'TBD';
+    return st[2].team;
+  }
   // 3rd place: use user's personal ranking to pick best from listed groups
   // userRanking is ordered list of group keys [A,B,C,...] — top 8 qualify
   const _uname2 = typeof user==='object'?user?.realName:user;
@@ -1142,7 +1155,32 @@ function renderGroups(){
       <div class="mgrid" style="margin-bottom:24px">${mhtml}</div>`;
   }).join('');
 
-  document.getElementById('groups-content').innerHTML = progressHtml + html;
+  // Build final standings section
+  const standings = computeStandings(ME?ME.realName:null);
+  const standingsHtml = `
+    <div class="sec-title" style="margin-top:40px">📊 PREDICTED FINAL STANDINGS</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-bottom:24px">
+      ${Object.keys(GROUPS).map(gk=>{
+        const rows = standings[gk]||[];
+        return `<div class="gtable">
+          <div class="grow ghead"><div>Group ${gk}</div><div>W</div><div>D</div><div>L</div><div>Pts</div></div>
+          ${rows.map((r,i)=>`
+            <div class="grow ${i<2?'gqualify':i===2?'g3rd':''}">
+              <div class="gname"><span>${fl(r.team)}</span><span style="font-size:12px">${r.team}</span></div>
+              <div class="gcell">${r.w}</div>
+              <div class="gcell">${r.d}</div>
+              <div class="gcell">${r.l}</div>
+              <div class="gpts">${r.pts}</div>
+            </div>`).join('')}
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:32px;display:flex;gap:16px">
+      <span><span style="display:inline-block;width:8px;height:8px;background:var(--green);border-radius:2px;margin-right:4px"></span>Auto-qualify (top 2)</span>
+      <span><span style="display:inline-block;width:8px;height:8px;background:var(--gold);border-radius:2px;margin-right:4px"></span>3rd place bubble</span>
+    </div>`;
+
+  document.getElementById('groups-content').innerHTML = progressHtml + html + standingsHtml;
 }
 
 function groupPick(matchId, pick){
@@ -1584,12 +1622,18 @@ function renderThirdRankList(){
 
   const standings = computeStandings(ME?ME.realName:null);
 
+  // Sort ranking by pts descending, preserving user order within equal pts tiers
+  const ptsMap = {};
+  ranking.forEach(gk=>{ const st=standings[gk]; ptsMap[gk]=st&&st[2]?st[2].pts:0; });
+  ranking.sort((a,b)=>ptsMap[b]-ptsMap[a]||(ranking.indexOf(a)-ranking.indexOf(b)));
+  ME.bonusPicks.thirdRanking = ranking;
+
   el.innerHTML = ranking.map((gk,i)=>{
     const st = standings[gk];
     const team = st&&st[2] ? st[2].team : '?';
     const pts = st&&st[2] ? st[2].pts : 0;
     const qualifies = i < 8;
-    return `<div class="rank-row" data-group="${gk}" draggable="${!locked}" style="
+    return `<div class="rank-row" data-group="${gk}" data-pts="${pts}" draggable="${!locked}" style="
       display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:7px;
       background:${qualifies?'rgba(0,200,83,.07)':'rgba(229,57,53,.05)'};
       border:1px solid ${qualifies?'rgba(0,200,83,.2)':'rgba(229,57,53,.15)'};
@@ -1612,14 +1656,27 @@ function initDragDrop(){
   let dragging = null;
 
   list.querySelectorAll('.rank-row').forEach(row=>{
-    row.addEventListener('dragstart', e=>{ dragging=row; setTimeout(()=>row.style.opacity='.4',0); });
-    row.addEventListener('dragend', ()=>{ dragging.style.opacity='1'; dragging=null; saveThirdRanking(); });
-    row.addEventListener('dragover', e=>{ e.preventDefault(); if(dragging&&dragging!==row){ 
+    row.addEventListener('dragstart', e=>{
+      dragging=row;
+      setTimeout(()=>row.style.opacity='.4',0);
+    });
+    row.addEventListener('dragend', ()=>{
+      dragging.style.opacity='1';
+      dragging=null;
+      saveThirdRanking();
+    });
+    row.addEventListener('dragover', e=>{
+      e.preventDefault();
+      if(!dragging||dragging===row) return;
+      // Only allow drag within same points tier
+      const dragPts = parseInt(dragging.dataset.pts||'0');
+      const targetPts = parseInt(row.dataset.pts||'0');
+      if(dragPts !== targetPts) return; // block cross-tier drag
       const rect=row.getBoundingClientRect();
       const mid=rect.top+rect.height/2;
       if(e.clientY<mid) list.insertBefore(dragging,row);
       else list.insertBefore(dragging,row.nextSibling);
-    }});
+    });
   });
 }
 
