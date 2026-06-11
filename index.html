@@ -1845,7 +1845,7 @@ function renderThirdRankList(){
           background:${isIn?'rgba(16,185,129,.08)':isBubble?'rgba(245,158,11,.07)':'rgba(229,57,53,.04)'};
           border:1px solid ${isIn?'rgba(16,185,129,.25)':isBubble?'rgba(245,158,11,.3)':'rgba(229,57,53,.12)'};
           ${isBubble&&!locked?'cursor:pointer;':''}
-        " ${isBubble&&!locked?`onclick="toggleThirdTiebreak('${t.gk}','${spotsLeft}')"`:''}">
+         ${isBubble&&!locked?`onclick="toggleThirdTiebreak('${t.gk}','${spotsLeft}')"`:''}>  
           <div style="font-size:18px;color:${isIn?'var(--green)':isBubble?'var(--gold)':'var(--muted)'};width:22px;text-align:center;font-family:'Bebas Neue',sans-serif">${i+1}</div>
           <div style="flex:1;font-size:13px;font-weight:600">${fl(t.team)} ${t.team} <span style="color:var(--muted);font-size:11px">Grp ${t.gk}</span></div>
           <div style="font-size:11px;color:var(--muted2)">${t.pts}pts</div>
