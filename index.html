@@ -938,15 +938,46 @@ function resolveKOTeams(user){
   const kp = playerObj.koPicks||{};
   const res = ST.results;
 
-  // Step 1: R32 — t1 from group standings, t2 either from standings or user's 3rd place pick
+  // Step 1: Build 3rd place assignment — each team fills exactly ONE slot
+  // Get user's ranked 3rd place teams
   const bonusPk = (ME&&ME.realName===user) ? ME.bonusPicks : (ALL_PLAYERS.find(p=>p.realName===user)||{}).bonusPicks||{};
-  const thirdPicks = bonusPk?.thirdMatchPicks||{};
+  const userRanking3rd = (bonusPk?.thirdRanking && bonusPk.thirdRanking.length > 0)
+    ? bonusPk.thirdRanking
+    : Object.keys(GROUPS);
+  const qualified3rd = userRanking3rd.slice(0, 8); // top 8 qualify
 
+  // Get the 3rd place team from each qualified group
+  const third3rdTeams = {}; // group -> team name
+  qualified3rd.forEach(gk => {
+    const st = standings[gk];
+    if(st && st[2]) third3rdTeams[gk] = st[2].team;
+  });
+
+  // Assign 3rd place teams to slots — greedy: highest-ranked eligible team per slot, no repeats
+  const assigned3rd = {}; // matchId -> team
+  const usedGroups = new Set();
+
+  // Process slots in ranking order of the top-ranked eligible team
+  const thirdSlots = KNOCKOUT_MATCHES.filter(m => m.round==='R32' && m.seedT2 && m.seedT2.startsWith('3') && m.seedT2.length > 2);
+
+  // Sort slots by which has the highest-ranked eligible team (so best teams get placed first)
+  thirdSlots.forEach(m => {
+    const eligibleGroups = m.seedT2.slice(1).split('');
+    // Find highest-ranked eligible unassigned group
+    for(const gk of qualified3rd){
+      if(eligibleGroups.includes(gk) && !usedGroups.has(gk) && third3rdTeams[gk]){
+        assigned3rd[m.id] = third3rdTeams[gk];
+        usedGroups.add(gk);
+        break;
+      }
+    }
+  });
+
+  // Step 1: R32 — resolve all teams
   KNOCKOUT_MATCHES.filter(m=>m.round==='R32').forEach(m=>{
     let t2;
     if(m.seedT2 && m.seedT2.startsWith('3') && m.seedT2.length > 2){
-      // Multi-group 3rd place slot — use user's explicit pick if set
-      t2 = thirdPicks[m.id] || resolveTeam(m.seedT2, standings, user, overrides);
+      t2 = assigned3rd[m.id] || 'TBD';
     } else {
       t2 = resolveTeam(m.seedT2, standings, user, overrides);
     }
