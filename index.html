@@ -931,12 +931,6 @@ function resolveTeam(seed, standings, user, adminOverrides){
   const st = standings[bestGroup];
   if(!st || !st[2]) return 'TBD';
 
-  // Check all matches in this group are picked before resolving
-  const gMatchIds = GROUP_MATCHES.filter(m=>m.group===bestGroup).map(m=>m.id);
-  const bgp = (ME && ME.realName===_uname2) ? (ME.groupPicks||{}) : (ALL_PLAYERS.find(p=>p.realName===_uname2)||{}).groupPicks||{};
-  const allPicked = gMatchIds.every(id => ST.results[id]!==undefined || bgp[id]);
-  if(!allPicked) return 'TBD';
-
   return st[2].team;
 }
 
