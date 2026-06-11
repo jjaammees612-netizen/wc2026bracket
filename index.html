@@ -1828,6 +1828,8 @@ function renderThirdRankList(){
   // Save qualified to bonusPicks for slot assignment
   ME.bonusPicks.thirdQualifiers = [...qualified];
   ME.bonusPicks.thirdRanking = [...qualified]; // backwards compat
+  // Auto-save if qualifiers changed (no tiebreak needed case)
+  if(!needsTiebreak) saveMyPicks();
 
   el.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:5px">
