@@ -950,10 +950,9 @@ function resolveKOTeams(user){
   // Step 1: Build 3rd place assignment — each team fills exactly ONE slot
   // Get user's ranked 3rd place teams
   const bonusPk = (ME&&ME.realName===user) ? ME.bonusPicks : (ALL_PLAYERS.find(p=>p.realName===user)||{}).bonusPicks||{};
-  const userRanking3rd = (bonusPk?.thirdRanking && bonusPk.thirdRanking.length > 0)
-    ? bonusPk.thirdRanking
-    : Object.keys(GROUPS);
-  const qualified3rd = userRanking3rd.slice(0, 8); // top 8 qualify
+  const qualified3rd = (bonusPk?.thirdQualifiers && bonusPk.thirdQualifiers.length > 0)
+    ? bonusPk.thirdQualifiers
+    : (bonusPk?.thirdRanking || Object.keys(GROUPS)).slice(0, 8);
 
   // Get the 3rd place team from each qualified group
   const third3rdTeams = {}; // group -> team name
@@ -962,24 +961,22 @@ function resolveKOTeams(user){
     if(st && st[2]) third3rdTeams[gk] = st[2].team;
   });
 
-  // Assign 3rd place teams to slots using optimal matching
-  // This mirrors FIFA Annex C: each qualified team goes to exactly one slot
+  // Assign 3rd place teams to slots using Hungarian-style optimal matching
   const assigned3rd = {};
   const usedGroups = new Set();
   const thirdSlots = KNOCKOUT_MATCHES.filter(m => m.round==='R32' && m.seedT2 && m.seedT2.startsWith('3') && m.seedT2.length > 2);
 
-  // Build eligibility map: slot -> eligible qualified groups
+  // Build eligibility: slot -> qualified eligible groups
   const slotEligible = {};
   thirdSlots.forEach(m => {
     slotEligible[m.id] = m.seedT2.slice(1).split('').filter(gk => qualified3rd.includes(gk) && third3rdTeams[gk]);
   });
 
-  // Iteratively assign: each pass, assign slots that have only ONE eligible option
-  // Then assign remaining by highest-ranked team
+  // Iteratively resolve forced assignments (slots/groups with only one option)
   let changed = true;
   while(changed){
     changed = false;
-    // First pass: assign slots with exactly one eligible unassigned group
+    // Assign slots that have only one available group
     thirdSlots.forEach(m => {
       if(assigned3rd[m.id]) return;
       const avail = slotEligible[m.id].filter(gk => !usedGroups.has(gk));
@@ -989,19 +986,37 @@ function resolveKOTeams(user){
         changed = true;
       }
     });
+    // Also assign groups that can only go to one slot
+    qualified3rd.forEach(gk => {
+      if(usedGroups.has(gk)) return;
+      const possibleSlots = thirdSlots.filter(m => !assigned3rd[m.id] && slotEligible[m.id].includes(gk));
+      if(possibleSlots.length === 1){
+        assigned3rd[possibleSlots[0].id] = third3rdTeams[gk];
+        usedGroups.add(gk);
+        changed = true;
+      }
+    });
   }
 
-  // Second pass: assign remaining slots by user's ranking order
-  thirdSlots.forEach(m => {
-    if(assigned3rd[m.id]) return;
+  // For remaining unresolved slots, assign by: pick the slot whose highest-ranked
+  // eligible group has the fewest other slot options (scarcest first)
+  const unresolved = thirdSlots.filter(m => !assigned3rd[m.id]);
+  while(unresolved.length > 0){
+    // Find the slot with fewest available options
+    unresolved.sort((a,b) => {
+      const aAvail = slotEligible[a.id].filter(gk => !usedGroups.has(gk)).length;
+      const bAvail = slotEligible[b.id].filter(gk => !usedGroups.has(gk)).length;
+      return aAvail - bAvail;
+    });
+    const m = unresolved[0];
     const avail = slotEligible[m.id].filter(gk => !usedGroups.has(gk));
-    // Pick highest ranked available
     avail.sort((a,b) => qualified3rd.indexOf(a) - qualified3rd.indexOf(b));
     if(avail.length > 0){
       assigned3rd[m.id] = third3rdTeams[avail[0]];
       usedGroups.add(avail[0]);
     }
-  });
+    unresolved.splice(0, 1);
+  }
 
   // Step 1: R32 — resolve all teams
   KNOCKOUT_MATCHES.filter(m=>m.round==='R32').forEach(m=>{
@@ -1775,178 +1790,85 @@ function renderThirdRankList(){
   if(!el) return;
   const locked = isLocked();
   if(!ME.bonusPicks) ME.bonusPicks={};
-  // Default ranking alphabetically if not set — user can drag to reorder
-  let ranking = (ME.bonusPicks.thirdRanking && ME.bonusPicks.thirdRanking.length > 0) 
-    ? ME.bonusPicks.thirdRanking 
-    : Object.keys(GROUPS);
-  // Make sure all 12 groups are present
-  const allGroups = Object.keys(GROUPS);
-  allGroups.forEach(g=>{ if(!ranking.includes(g)) ranking.push(g); });
-  ranking = ranking.filter(g=>allGroups.includes(g));
-  ME.bonusPicks.thirdRanking = ranking;
 
   const standings = computeStandings(ME?ME.realName:null);
+  const allGroups = Object.keys(GROUPS);
 
-  // Sort ranking by pts descending, preserving user order within equal pts tiers
-  const ptsMap = {};
-  ranking.forEach(gk=>{ const st=standings[gk]; ptsMap[gk]=st&&st[2]?st[2].pts:0; });
-  ranking.sort((a,b)=>ptsMap[b]-ptsMap[a]||(ranking.indexOf(a)-ranking.indexOf(b)));
-  ME.bonusPicks.thirdRanking = ranking;
-
-  el.innerHTML = ranking.map((gk,i)=>{
+  // Get all 12 third-place teams sorted by pts desc
+  const thirds = allGroups.map(gk=>{
     const st = standings[gk];
-    const team = st&&st[2] ? st[2].team : '?';
-    const pts = st&&st[2] ? st[2].pts : 0;
-    const qualifies = i < 8;
-    return `<div class="rank-row" data-group="${gk}" data-pts="${pts}" draggable="${!locked}" style="
-      display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:7px;
-      background:${qualifies?'rgba(0,200,83,.07)':'rgba(229,57,53,.05)'};
-      border:1px solid ${qualifies?'rgba(0,200,83,.2)':'rgba(229,57,53,.15)'};
-      cursor:${locked?'default':'grab'};user-select:none;transition:opacity .15s;
-    ">
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:${qualifies?'var(--green)':'var(--muted)'};width:22px;text-align:center">${i+1}</div>
-      <div style="font-size:13px;flex:1;font-weight:500">${fl(team)} ${team} <span style="color:var(--muted);font-size:11px">(Group ${gk})</span></div>
-      <div style="font-size:11px;color:var(--muted2)">${pts}pts predicted</div>
-      <div style="font-size:11px;font-weight:700;${qualifies?'color:var(--green)':'color:var(--red)'}">${qualifies?'✓ IN':'✗ OUT'}</div>
-      ${!locked?'<div style="color:var(--muted);font-size:16px;cursor:grab">⠿</div>':''}
-    </div>`;
-  }).join('');
+    return st&&st[2] ? {gk, team:st[2].team, pts:st[2].pts, w:st[2].w} : {gk, team:'?', pts:0, w:0};
+  }).sort((a,b)=>b.pts-a.pts||b.w-a.w);
 
-  if(!locked) initDragDrop();
-}
+  // Find the cutoff — 8th place pts
+  const cutoffPts = thirds[7]?.pts ?? 0;
+  const cutoffW = thirds[7]?.w ?? 0;
 
-function initDragDrop(){
-  const list = document.getElementById('third-rank-list');
-  if(!list) return;
-  let dragging = null;
+  // Auto-qualify: teams with pts > cutoff pts qualify automatically
+  // Teams exactly on the bubble (same pts AND wins as 8th) need tiebreak
+  const autoIn = thirds.filter(t=>t.pts>cutoffPts||(t.pts===cutoffPts&&t.w>cutoffW));
+  const autoOut = thirds.filter(t=>t.pts<cutoffPts||(t.pts===cutoffPts&&t.w<cutoffW));
+  const bubble = thirds.filter(t=>t.pts===cutoffPts&&t.w===cutoffW);
+  const spotsLeft = 8 - autoIn.length;
 
-  list.querySelectorAll('.rank-row').forEach(row=>{
-    row.addEventListener('dragstart', e=>{
-      dragging=row;
-      setTimeout(()=>row.style.opacity='.4',0);
-    });
-    row.addEventListener('dragend', ()=>{
-      dragging.style.opacity='1';
-      dragging=null;
-      saveThirdRanking();
-    });
-    row.addEventListener('dragover', e=>{
-      e.preventDefault();
-      if(!dragging||dragging===row) return;
-      // Only allow drag within same points tier
-      const dragPts = parseInt(dragging.dataset.pts||'0');
-      const targetPts = parseInt(row.dataset.pts||'0');
-      if(dragPts !== targetPts) return; // block cross-tier drag
-      const rect=row.getBoundingClientRect();
-      const mid=rect.top+rect.height/2;
-      if(e.clientY<mid) list.insertBefore(dragging,row);
-      else list.insertBefore(dragging,row.nextSibling);
-    });
-  });
-}
+  // For bubble teams, user picks which ones fill remaining spots
+  const tiebreakPicks = new Set(ME.bonusPicks.thirdTiebreak||[]);
 
-function saveThirdRanking(){
-  const list = document.getElementById('third-rank-list');
-  if(!list||!ME) return;
-  const ranking = [...list.querySelectorAll('.rank-row')].map(r=>r.dataset.group);
-  if(!ME.bonusPicks) ME.bonusPicks={};
-  ME.bonusPicks.thirdRanking = ranking;
-  
-  renderThirdRankList(); // re-render to update colors/labels
-  renderThirdRankList();
-}
+  // If no tie (spotsLeft === bubble.length), all bubble teams qualify automatically
+  const needsTiebreak = bubble.length > spotsLeft && spotsLeft > 0;
 
-// called after renderBonus sets innerHTML
-function postRenderBonus(){ renderThirdRankList(); }
-
-function setBonusPick(type, val){
-  if(!ME||!val) return;
-  if(isLocked()){showToast('🔒 Picks are locked!');return;}
-  if(!ME.bonusPicks) ME.bonusPicks={};
-  ME.bonusPicks[type]=val;
-  saveMyPicks();
-  const label = type==='champion'?`${fl(val)} ${val}`:val;
-  showToast(`${type==='champion'?'🏆':'⚽'} ${label} picked!`);
-  renderBonus();
-  setTimeout(renderThirdRankList, 0);
-}
-
-async function setActual(type){
-  const sel = document.getElementById(type==='champion'?'set-champ-sel':'set-scorer-sel');
-  const val = sel?.value;
-  if(!val){showToast('Select a value first');return;}
-  if(type==='champion') ST.actualChampion=val;
-  else ST.actualTopScorer=val;
-  await saveMeta(type==='champion'?'actualChampion':'actualTopScorer', val);
-  showToast(`✅ Actual ${type==='champion'?'champion':'top scorer'} set: ${val}`);
-  renderAll();
-}
-
-// ====================================================
-// RENDER ALL
-// ====================================================
-function renderAll(){
-  if(activeTab==='groups') renderGroups();
-  if(activeTab==='knockout'){ loadAllPlayers().then(renderKnockout); return; }
-  if(activeTab==='bonus') renderBonus();
-  if(activeTab==='mypicks') renderMyPicks();
-  if(activeTab==='friends') refreshAndRenderFriends();
-  if(activeTab==='leaderboard') renderLeaderboard();
-}
-
-// ====================================================
-// BOOT
-// ====================================================
-async function boot(){
-  console.log('Boot started, supabase:', typeof supabase);
-  sb = supabase.createClient(SUPA_URL, SUPA_KEY);
-  console.log('Supabase client created');
-  try {
-    await Promise.all([loadResults(), loadMeta(), loadAllPlayers()]);
-    console.log('Data loaded. Players:', ALL_PLAYERS.length, 'Results:', Object.keys(ST.results).length);
-  } catch(e) {
-    console.error('Boot load error:', e);
-    showToast('⚠️ Connection error — refresh');
+  // Build final qualified set
+  let qualified;
+  if(!needsTiebreak){
+    qualified = new Set([...autoIn.map(t=>t.gk), ...bubble.slice(0,spotsLeft).map(t=>t.gk)]);
+  } else {
+    qualified = new Set([...autoIn.map(t=>t.gk), ...[...tiebreakPicks].slice(0,spotsLeft)]);
   }
 
-  // Try to restore session from localStorage
-  const savedId = loadSessionId();
-  if(savedId){
-    const player = ALL_PLAYERS.find(p=>p.id===savedId);
-    if(player){
-      ME = {...player};
-      updateHeaderName();
-      document.getElementById('modal').style.display='none';
-      if(isLocked()) document.getElementById('lockbanner').style.display='block';
-      // Render only after picks confirmed loaded
-      renderAll();
-      return;
-    } else {
-      // Session ID found but player not in DB — clear stale session
-      clearSession();
-    }
-  }
+  // Save qualified to bonusPicks for slot assignment
+  ME.bonusPicks.thirdQualifiers = [...qualified];
+  ME.bonusPicks.thirdRanking = [...qualified]; // backwards compat
 
-  // No session — show modal
-  document.getElementById('modal').style.display='flex';
-  showModalScreen(1);
-  const countEl = document.getElementById('player-count-display');
-  if(countEl) countEl.textContent = `${ALL_PLAYERS.length}/10 players joined`;
-  if(ALL_PLAYERS.length >= 10) showModalScreen(3); // send to restore only
-
-  // Poll for updates every 30s
-  setInterval(async()=>{
-    await Promise.all([loadResults(), loadMeta(), loadAllPlayers()]);
-    if(ME){
-      // Refresh ME from latest data
-      const fresh = ALL_PLAYERS.find(p=>p.id===ME.id);
-      if(fresh) ME = {...fresh};
-    }
-    renderAll();
-  }, 15000);
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:5px">
+      ${thirds.map((t,i)=>{
+        const isIn = qualified.has(t.gk);
+        const isBubble = needsTiebreak && bubble.some(b=>b.gk===t.gk);
+        const isTiePick = tiebreakPicks.has(t.gk);
+        return `<div style="
+          display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:7px;
+          background:${isIn?'rgba(16,185,129,.08)':isBubble?'rgba(245,158,11,.07)':'rgba(229,57,53,.04)'};
+          border:1px solid ${isIn?'rgba(16,185,129,.25)':isBubble?'rgba(245,158,11,.3)':'rgba(229,57,53,.12)'};
+          ${isBubble&&!locked?'cursor:pointer;':''}
+        " ${isBubble&&!locked?`onclick="toggleThirdTiebreak('${t.gk}','${spotsLeft}')"`:''}">
+          <div style="font-size:18px;color:${isIn?'var(--green)':isBubble?'var(--gold)':'var(--muted)'};width:22px;text-align:center;font-family:'Bebas Neue',sans-serif">${i+1}</div>
+          <div style="flex:1;font-size:13px;font-weight:600">${fl(t.team)} ${t.team} <span style="color:var(--muted);font-size:11px">Grp ${t.gk}</span></div>
+          <div style="font-size:11px;color:var(--muted2)">${t.pts}pts</div>
+          <div style="font-size:11px;font-weight:700;color:${isIn?'var(--green)':isBubble?'var(--gold)':'var(--red)'}">
+            ${isIn?(isBubble?'✓ PICK':'✓ IN'):isBubble?'PICK?':'✗ OUT'}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    ${needsTiebreak?`<div style="font-size:11px;color:var(--gold);margin-top:10px">
+      ⚠️ ${bubble.length} teams tied — tap the highlighted ones to pick which ${spotsLeft} qualify
+    </div>`:''}
+    ${!needsTiebreak?`<div style="font-size:11px;color:var(--muted);margin-top:8px">Top 8 auto-qualified by points · no tiebreak needed</div>`:''}
+  `;
 }
 
-boot();
+function toggleThirdTiebreak(gk, spotsLeft){
+  if(!ME||isLocked()) return;
+  if(!ME.bonusPicks) ME.bonusPicks={};
+  const picks = new Set(ME.bonusPicks.thirdTiebreak||[]);
+  if(picks.has(gk)){
+    picks.delete(gk);
+  } else {
+    if(picks.size >= parseInt(spotsLeft)){ showToast('Already picked enough — deselect one first'); return; }
+    picks.add(gk);
+  }
+  ME.bonusPicks.thirdTiebreak = [...picks];
+  saveMyPicks(
 </script>
 </body>
 </html>
