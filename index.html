@@ -382,9 +382,6 @@ const supabase = {
 
   <!-- LEADERBOARD -->
   <div class="view" id="view-leaderboard">
-    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
-      ${ME&&(ME.subgroup||1)===2?'🟡 Sub-group 2':'🟢 Sub-group 1'} · ${scored.length} players
-    </div>
     <div class="lbtable">
       <div class="lbrow lbhead">
         <div>#</div><div>Player</div>
@@ -642,7 +639,6 @@ async function loadAllPlayers(){
       id: p.id,
       realName: p.real_name,
       teamName: p.team_name,
-      subgroup: p.subgroup||1,
       groupPicks: pk.group_picks||{},
       koPicks: pk.ko_picks||{},
       bonusPicks: pk.bonus_picks||{},
@@ -812,7 +808,7 @@ async function restoreByName(){
   // Load full player data
   await loadAllPlayers();
   const player = ALL_PLAYERS.find(p=>p.id===match.id);
-  ME = player ? {...player} : {id:match.id, realName:match.real_name, teamName:match.team_name, subgroup:match.subgroup||1, groupPicks:{}, koPicks:{}, bonusPicks:{}};
+  ME = player ? {...player} : {id:match.id, realName:match.real_name, teamName:match.team_name, groupPicks:{}, koPicks:{}, bonusPicks:{}};
   saveSession(match.id);
   updateHeaderName();
   document.getElementById('modal').style.display='none';
@@ -1571,9 +1567,7 @@ async function refreshAndRenderFriends(){
 function renderFriends(){
   // Build list of all users who have ANY picks
   const fgrid = document.getElementById('fgrid');
-  const mySubgroup = ME ? (ME.subgroup||1) : 1;
-  const visiblePlayers = ALL_PLAYERS.filter(p=>(p.subgroup||1)===mySubgroup);
-  fgrid.innerHTML = visiblePlayers.map(u=>{
+  fgrid.innerHTML = ALL_PLAYERS.map(u=>{
     const sc = calcScore(u.realName);
     const isMe = ME && u.id===ME.id;
     return `<div class="fcard ${activeFriend===u.id?'active':''}" onclick="viewFriend('${u.id}')">
@@ -1587,7 +1581,7 @@ function renderFriends(){
   const fd = document.getElementById('friend-detail');
   if(!activeFriend){fd.innerHTML='';return;}
 
-  const friendPlayer = ALL_PLAYERS.find(p=>p.id===activeFriend && (p.subgroup||1)===mySubgroup);
+  const friendPlayer = ALL_PLAYERS.find(p=>p.id===activeFriend);
   if(!friendPlayer){fd.innerHTML='';return;}
   const gp = friendPlayer.groupPicks||{};
   const kp = friendPlayer.koPicks||{};
