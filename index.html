@@ -1516,6 +1516,11 @@ function renderMyPicks(){
 // ====================================================
 // RENDER: FRIENDS
 // ====================================================
+async function refreshAndRenderFriends(){
+  await loadAllPlayers();
+  renderFriends();
+}
+
 function renderFriends(){
   // Build list of all users who have ANY picks
   const fgrid = document.getElementById('fgrid');
@@ -1603,7 +1608,7 @@ const ALL_TEAMS = Object.values(GROUPS).flatMap(g=>g.teams).sort();
 const TOP_SCORERS = [
   'Kylian Mbappé','Erling Haaland','Vinicius Jr.','Lionel Messi','Cristiano Ronaldo',
   'Harry Kane','Lautaro Martínez','Antoine Griezmann','Bukayo Saka','Phil Foden',
-  'Pedri','Gavi','Federico Valverde','Jude Bellingham','Lamine Yamal','Kenan Yıldız',
+  'Pedri','Gavi','Federico Valverde','Jude Bellingham','Lamine Yamal','Kenan Yıldız','Mikel Oyarzabal',
   'Marcus Rashford','Leroy Sané','Jamal Musiala','Rafael Leão','Bernardo Silva',
   'Romelu Lukaku','Robert Lewandowski','Memphis Depay','Cody Gakpo','Wout Weghorst',
   'Mohammed Salah','Sadio Mané','Achraf Hakimi','Youssef En-Nesyri','Dani Olmo',
@@ -1818,10 +1823,10 @@ async function setActual(type){
 // ====================================================
 function renderAll(){
   if(activeTab==='groups') renderGroups();
-  if(activeTab==='knockout') renderKnockout();
+  if(activeTab==='knockout'){ loadAllPlayers().then(renderKnockout); return; }
   if(activeTab==='bonus') renderBonus();
   if(activeTab==='mypicks') renderMyPicks();
-  if(activeTab==='friends') renderFriends();
+  if(activeTab==='friends') refreshAndRenderFriends();
   if(activeTab==='leaderboard') renderLeaderboard();
 }
 
@@ -1872,7 +1877,7 @@ async function boot(){
       if(fresh) ME = {...fresh};
     }
     renderAll();
-  }, 30000);
+  }, 15000);
 }
 
 boot();
