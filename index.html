@@ -718,7 +718,8 @@ function getPrizes(n){
 // ====================================================
 // LOCK CHECK
 // ====================================================
-function isLocked(){return new Date() >= LOCK_DATE;}
+function isLocked(){return new Date() >= LOCK_DATE;} // group stage only
+function isKOLocked(){return false;} // knockout + 3rd place always open for now
 
 // ====================================================
 // MODAL FLOW
@@ -1790,7 +1791,7 @@ function renderBonus(){
 function renderThirdRankList(){
   const el = document.getElementById('third-rank-list');
   if(!el) return;
-  const locked = isLocked();
+  const locked = isKOLocked();
   if(!ME.bonusPicks) ME.bonusPicks={};
 
   const standings = computeStandings(ME?ME.realName:null);
@@ -1862,7 +1863,7 @@ function renderThirdRankList(){
 }
 
 function toggleThirdTiebreak(gk, spotsLeft){
-  if(!ME||isLocked()) return;
+  if(!ME||isKOLocked()) return;
   if(!ME.bonusPicks) ME.bonusPicks={};
   const picks = new Set(ME.bonusPicks.thirdTiebreak||[]);
   if(picks.has(gk)){
