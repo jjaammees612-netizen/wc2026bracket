@@ -1791,95 +1791,74 @@ function renderBonus(){
 function renderThirdRankList(){
   const el = document.getElementById('third-rank-list');
   if(!el) return;
-  const locked = isKOLocked();
   if(!ME.bonusPicks) ME.bonusPicks={};
 
   const standings = computeStandings(ME?ME.realName:null);
   const allGroups = Object.keys(GROUPS);
+  const selected = new Set(ME.bonusPicks.thirdQualifiers||[]);
+  const count = selected.size;
 
-  // Get all 12 third-place teams sorted by pts desc
-  const thirds = allGroups.map(gk=>{
-    const st = standings[gk];
-    return st&&st[2] ? {gk, team:st[2].team, pts:st[2].pts, w:st[2].w} : {gk, team:'?', pts:0, w:0};
-  }).sort((a,b)=>b.pts-a.pts||b.w-a.w);
-
-  // Find the cutoff — 8th place pts
-  const cutoffPts = thirds[7]?.pts ?? 0;
-  const cutoffW = thirds[7]?.w ?? 0;
-
-  // Auto-qualify: teams with pts > cutoff pts qualify automatically
-  // Teams exactly on the bubble (same pts AND wins as 8th) need tiebreak
-  const autoIn = thirds.filter(t=>t.pts>cutoffPts||(t.pts===cutoffPts&&t.w>cutoffW));
-  const autoOut = thirds.filter(t=>t.pts<cutoffPts||(t.pts===cutoffPts&&t.w<cutoffW));
-  const bubble = thirds.filter(t=>t.pts===cutoffPts&&t.w===cutoffW);
-  const spotsLeft = 8 - autoIn.length;
-
-  // For bubble teams, user picks which ones fill remaining spots
-  const tiebreakPicks = new Set(ME.bonusPicks.thirdTiebreak||[]);
-
-  // If no tie (spotsLeft === bubble.length), all bubble teams qualify automatically
-  const needsTiebreak = bubble.length > spotsLeft && spotsLeft > 0;
-
-  // Build final qualified set
-  let qualified;
-  if(!needsTiebreak){
-    qualified = new Set([...autoIn.map(t=>t.gk), ...bubble.slice(0,spotsLeft).map(t=>t.gk)]);
-  } else {
-    qualified = new Set([...autoIn.map(t=>t.gk), ...[...tiebreakPicks].slice(0,spotsLeft)]);
-  }
-
-  // Save qualified to bonusPicks for slot assignment
-  ME.bonusPicks.thirdQualifiers = [...qualified];
-  ME.bonusPicks.thirdRanking = [...qualified]; // backwards compat
-  // Auto-save if qualifiers changed (no tiebreak needed case)
-  if(!needsTiebreak) saveMyPicks();
+  // Sort by pts desc
+  const sorted = [...allGroups].sort((a,b)=>{
+    const pa = standings[a]&&standings[a][2]?standings[a][2].pts:0;
+    const pb = standings[b]&&standings[b][2]?standings[b][2].pts:0;
+    return pb-pa||a.localeCompare(b);
+  });
 
   el.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:5px">
-      ${thirds.map((t,i)=>{
-        const isIn = qualified.has(t.gk);
-        const isBubble = needsTiebreak && bubble.some(b=>b.gk===t.gk);
-        const isTiePick = tiebreakPicks.has(t.gk);
-        return `<div style="
-          display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:7px;
-          background:${isIn?'rgba(16,185,129,.08)':isBubble?'rgba(245,158,11,.07)':'rgba(229,57,53,.04)'};
-          border:1px solid ${isIn?'rgba(16,185,129,.25)':isBubble?'rgba(245,158,11,.3)':'rgba(229,57,53,.12)'};
-          ${isBubble&&!locked?'cursor:pointer;':''}
-         ${isBubble&&!locked?`onclick="toggleThirdTiebreak('${t.gk}','${spotsLeft}')"`:''}>  
-          <div style="font-size:18px;color:${isIn?'var(--green)':isBubble?'var(--gold)':'var(--muted)'};width:22px;text-align:center;font-family:'Bebas Neue',sans-serif">${i+1}</div>
-          <div style="flex:1;font-size:13px;font-weight:600">${fl(t.team)} ${t.team} <span style="color:var(--muted);font-size:11px">Grp ${t.gk}</span></div>
-          <div style="font-size:11px;color:var(--muted2)">${t.pts}pts</div>
-          <div style="font-size:11px;font-weight:700;color:${isIn?'var(--green)':isBubble?'var(--gold)':'var(--red)'}">
-            ${isIn?(isBubble?'✓ PICK':'✓ IN'):isBubble?'PICK?':'✗ OUT'}
+    <div style="font-size:12px;color:${count===8?'var(--green)':'var(--gold)'};margin-bottom:10px;font-weight:600">
+      ${count}/8 selected ${count===8?'✓ Complete':'— pick exactly 8 teams you think qualify'}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px">
+      ${sorted.map(gk=>{
+        const st = standings[gk];
+        const team = st&&st[2]?st[2].team:'?';
+        const pts = st&&st[2]?st[2].pts:0;
+        const isSelected = selected.has(gk);
+        const canSelect = isSelected || count < 8;
+        return `<div onclick="${canSelect||isSelected?`toggleThird3rd('${gk}')`:''}" style="
+          display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;
+          background:${isSelected?'rgba(16,185,129,.1)':'rgba(255,255,255,.03)'};
+          border:1px solid ${isSelected?'var(--green)':'var(--border)'};
+          cursor:${canSelect?'pointer':'default'};
+          opacity:${!canSelect&&!isSelected?.5:1};
+          transition:all .15s;user-select:none;">
+          <div style="width:20px;height:20px;border-radius:4px;border:2px solid ${isSelected?'var(--green)':'var(--muted)'};
+            background:${isSelected?'var(--green)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            ${isSelected?'<span style="color:#000;font-size:12px;font-weight:900">✓</span>':''}
+          </div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600">${fl(team)} ${team}</div>
+            <div style="font-size:10px;color:var(--muted)">Group ${gk} · ${pts}pts</div>
           </div>
         </div>`;
       }).join('')}
     </div>
-    ${needsTiebreak?`<div style="font-size:11px;color:var(--gold);margin-top:10px">
-      ⚠️ ${bubble.length} teams tied — tap the highlighted ones to pick which ${spotsLeft} qualify
-    </div>`:''}
-    ${!needsTiebreak?`<div style="font-size:11px;color:var(--muted);margin-top:8px">Top 8 auto-qualified by points · no tiebreak needed</div>`:''}
-  `;
+    <div style="font-size:11px;color:var(--muted);margin-top:10px">Tap to select/deselect · pick exactly 8</div>`;
+
+  // Update qualifiers for bracket
+  ME.bonusPicks.thirdQualifiers = [...selected];
+  ME.bonusPicks.thirdRanking = [...selected];
 }
 
-function toggleThirdTiebreak(gk, spotsLeft){
-  if(!ME||isKOLocked()) return;
+function toggleThird3rd(gk){
+  if(!ME) return;
   if(!ME.bonusPicks) ME.bonusPicks={};
-  const picks = new Set(ME.bonusPicks.thirdTiebreak||[]);
-  if(picks.has(gk)){
-    picks.delete(gk);
+  const current = new Set(ME.bonusPicks.thirdQualifiers||[]);
+  if(current.has(gk)){
+    current.delete(gk);
   } else {
-    if(picks.size >= parseInt(spotsLeft)){ showToast('Already picked enough — deselect one first'); return; }
-    picks.add(gk);
+    if(current.size >= 8){ showToast('Already picked 8 — deselect one first'); return; }
+    current.add(gk);
   }
-  ME.bonusPicks.thirdTiebreak = [...picks];
-  // Recompute qualifiers before saving so slot assignment is up to date
-  renderThirdRankList(); // this sets ME.bonusPicks.thirdQualifiers
+  ME.bonusPicks.thirdQualifiers = [...current];
+  ME.bonusPicks.thirdRanking = [...current];
   saveMyPicks();
-  // Also re-render knockout so bracket updates immediately
-  if(activeTab==='groups') renderGroups();
-  else loadAllPlayers().then(renderKnockout);
+  renderThirdRankList();
+  if(activeTab==='knockout') loadAllPlayers().then(renderKnockout);
 }
+
+
 
 // ====================================================
 // RENDER ALL
