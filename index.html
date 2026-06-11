@@ -756,6 +756,7 @@ async function submitIdentity(){
     return;
   }
 
+  if(!sb){errEl.textContent='Still loading — try again in a moment.';errEl.style.display='block';return;}
   const btn = document.querySelector('#modal-screen-2 .mbtn');
   btn.textContent='Saving...'; btn.disabled=true;
 
@@ -796,6 +797,7 @@ async function restoreByName(){
   errEl.style.display='none';
   if(!name){errEl.textContent='Enter your name.';errEl.style.display='block';return;}
   if(!pin){errEl.textContent='Enter your PIN.';errEl.style.display='block';return;}
+  if(!sb){errEl.textContent='Still loading — try again in a moment.';errEl.style.display='block';return;}
 
   // Fetch player with matching name and pin directly from DB
   const {data:rows} = await sb.from('wc2026_players').select('*').eq('real_name',name);
