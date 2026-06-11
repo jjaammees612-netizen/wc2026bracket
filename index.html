@@ -257,6 +257,7 @@ const supabase = {
       <div class="mflag">⚽</div>
       <div class="mtitle">WC 2026 Bracket Battle</div>
       <div class="msub">48 teams · 104 matches · one winner</div>
+      <div id="player-count-display" style="font-size:12px;color:var(--muted2);margin-bottom:8px"></div>
       <div class="buyin">💵 $10 Buy-In · 10 Players</div>
       <div class="prizes">
         <div class="pcard"><div class="pplace">🥇 1st</div><div class="pamount">$50</div><div class="plabel">Winner</div></div>
@@ -381,6 +382,9 @@ const supabase = {
 
   <!-- LEADERBOARD -->
   <div class="view" id="view-leaderboard">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+      ${ME&&(ME.subgroup||1)===2?'🟡 Sub-group 2':'🟢 Sub-group 1'} · ${scored.length} players
+    </div>
     <div class="lbtable">
       <div class="lbrow lbhead">
         <div>#</div><div>Player</div>
@@ -638,6 +642,7 @@ async function loadAllPlayers(){
       id: p.id,
       realName: p.real_name,
       teamName: p.team_name,
+      subgroup: p.subgroup||1,
       groupPicks: pk.group_picks||{},
       koPicks: pk.ko_picks||{},
       bonusPicks: pk.bonus_picks||{},
@@ -739,6 +744,14 @@ async function submitIdentity(){
   if(!teamName){errEl.textContent='Enter a team name.';errEl.style.display='block';return;}
   if(!pin||pin.length!==4||!/^\d{4}$/.test(pin)){errEl.textContent='Enter a 4-digit PIN.';errEl.style.display='block';return;}
 
+  // Check if lobby is full (max 10 players)
+  if(ALL_PLAYERS.length >= 10){
+    errEl.textContent='The competition is full (10/10 players). Contact Pranay to join.';
+    errEl.style.display='block';
+    btn.textContent='Save & Enter Bracket →';btn.disabled=false;
+    return;
+  }
+
   // Check if name already taken
   const existing = ALL_PLAYERS.find(p=>p.realName.toLowerCase()===realName.toLowerCase());
   if(existing){
@@ -799,7 +812,7 @@ async function restoreByName(){
   // Load full player data
   await loadAllPlayers();
   const player = ALL_PLAYERS.find(p=>p.id===match.id);
-  ME = player ? {...player} : {id:match.id, realName:match.real_name, teamName:match.team_name, groupPicks:{}, koPicks:{}, bonusPicks:{}};
+  ME = player ? {...player} : {id:match.id, realName:match.real_name, teamName:match.team_name, subgroup:match.subgroup||1, groupPicks:{}, koPicks:{}, bonusPicks:{}};
   saveSession(match.id);
   updateHeaderName();
   document.getElementById('modal').style.display='none';
@@ -1228,7 +1241,10 @@ function renderGroups(){
               draggable="${isTied&&!locked}"
               ondragstart="groupRowDragStart(event)"
               ondragover="groupRowDragOver(event)"
-              ondragend="groupRowDragEnd(event,'${gk}')">
+              ondragend="groupRowDragEnd(event,'${gk}')"
+              ontouchstart="groupRowTouchStart(event,this)"
+              ontouchmove="groupRowTouchMove(event)"
+              ontouchend="groupRowTouchEnd(event,'${gk}')">
               <div style="color:var(--muted);font-size:12px">${isTied?'⠿':''}</div>
               <div class="gname"><span>${fl(r.team)}</span><span style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.team}</span></div>
               <div class="gcell">${r.w}</div>
@@ -1555,7 +1571,9 @@ async function refreshAndRenderFriends(){
 function renderFriends(){
   // Build list of all users who have ANY picks
   const fgrid = document.getElementById('fgrid');
-  fgrid.innerHTML = ALL_PLAYERS.map(u=>{
+  const mySubgroup = ME ? (ME.subgroup||1) : 1;
+  const visiblePlayers = ALL_PLAYERS.filter(p=>(p.subgroup||1)===mySubgroup);
+  fgrid.innerHTML = visiblePlayers.map(u=>{
     const sc = calcScore(u.realName);
     const isMe = ME && u.id===ME.id;
     return `<div class="fcard ${activeFriend===u.id?'active':''}" onclick="viewFriend('${u.id}')">
@@ -1569,7 +1587,7 @@ function renderFriends(){
   const fd = document.getElementById('friend-detail');
   if(!activeFriend){fd.innerHTML='';return;}
 
-  const friendPlayer = ALL_PLAYERS.find(p=>p.id===activeFriend);
+  const friendPlayer = ALL_PLAYERS.find(p=>p.id===activeFriend && (p.subgroup||1)===mySubgroup);
   if(!friendPlayer){fd.innerHTML='';return;}
   const gp = friendPlayer.groupPicks||{};
   const kp = friendPlayer.koPicks||{};
@@ -1866,19 +1884,14 @@ function renderAll(){
 // ====================================================
 async function boot(){
   console.log('Boot started, supabase:', typeof supabase);
-  if(false){
-    document.getElementById('modal').innerHTML = '<div class="mbox"><div class="mflag">⚠️</div><div class="mtitle">Load Error</div><div class="msub">Supabase failed to load. Check connection and refresh.</div></div>';
-    return;
-  }
   sb = supabase.createClient(SUPA_URL, SUPA_KEY);
   console.log('Supabase client created');
-  // Load all shared data from Supabase
   try {
     await Promise.all([loadResults(), loadMeta(), loadAllPlayers()]);
     console.log('Data loaded. Players:', ALL_PLAYERS.length, 'Results:', Object.keys(ST.results).length);
   } catch(e) {
     console.error('Boot load error:', e);
-    showToast('⚠️ Connection error — check console');
+    showToast('⚠️ Connection error — refresh');
   }
 
   // Try to restore session from localStorage
@@ -1890,14 +1903,21 @@ async function boot(){
       updateHeaderName();
       document.getElementById('modal').style.display='none';
       if(isLocked()) document.getElementById('lockbanner').style.display='block';
+      // Render only after picks confirmed loaded
       renderAll();
       return;
+    } else {
+      // Session ID found but player not in DB — clear stale session
+      clearSession();
     }
   }
 
   // No session — show modal
   document.getElementById('modal').style.display='flex';
   showModalScreen(1);
+  const countEl = document.getElementById('player-count-display');
+  if(countEl) countEl.textContent = `${ALL_PLAYERS.length}/10 players joined`;
+  if(ALL_PLAYERS.length >= 10) showModalScreen(3); // send to restore only
 
   // Poll for updates every 30s
   setInterval(async()=>{
