@@ -1870,7 +1870,14 @@ function toggleThirdTiebreak(gk, spotsLeft){
     picks.add(gk);
   }
   ME.bonusPicks.thirdTiebreak = [...picks];
-  saveMyPicks(
+  // Recompute qualifiers before saving so slot assignment is up to date
+  renderThirdRankList(); // this sets ME.bonusPicks.thirdQualifiers
+  saveMyPicks();
+  // Also re-render knockout so bracket updates immediately
+  if(activeTab==='groups') renderGroups();
+  else loadAllPlayers().then(renderKnockout);
+}
+
 </script>
 </body>
 </html>
