@@ -1880,6 +1880,68 @@ function toggleThirdTiebreak(gk, spotsLeft){
   else loadAllPlayers().then(renderKnockout);
 }
 
+// ====================================================
+// RENDER ALL
+// ====================================================
+function renderAll(){
+  if(activeTab==='groups') renderGroups();
+  if(activeTab==='knockout'){ loadAllPlayers().then(renderKnockout); return; }
+  if(activeTab==='bonus') renderBonus();
+  if(activeTab==='mypicks') renderMyPicks();
+  if(activeTab==='friends') refreshAndRenderFriends();
+  if(activeTab==='leaderboard') renderLeaderboard();
+}
+
+// ====================================================
+// BOOT
+// ====================================================
+async function boot(){
+  console.log('Boot started');
+  sb = supabase.createClient('https://skyenpwhqtxdaufvkwtg.supabase.co', 'sb_publishable_fZHAlZb_nrx4nmkf277bgg_ptvranpS');
+  console.log('Supabase client created');
+  try {
+    await Promise.all([loadResults(), loadMeta(), loadAllPlayers()]);
+    console.log('Data loaded. Players:', ALL_PLAYERS.length);
+  } catch(e) {
+    console.error('Boot load error:', e);
+    showToast('⚠️ Connection error — refresh');
+  }
+
+  // Try to restore session from localStorage
+  const savedId = loadSessionId();
+  if(savedId){
+    const player = ALL_PLAYERS.find(p=>p.id===savedId);
+    if(player){
+      ME = {...player};
+      updateHeaderName();
+      document.getElementById('modal').style.display='none';
+      if(isLocked()) document.getElementById('lockbanner').style.display='block';
+      renderAll();
+      return;
+    } else {
+      clearSession();
+    }
+  }
+
+  // No session — show modal screen 1
+  document.getElementById('modal').style.display='flex';
+  showModalScreen(1);
+  const countEl = document.getElementById('player-count-display');
+  if(countEl) countEl.textContent = `${ALL_PLAYERS.length}/10 players joined`;
+
+  // Poll for updates every 15s
+  setInterval(async()=>{
+    await Promise.all([loadResults(), loadMeta(), loadAllPlayers()]);
+    if(ME){
+      const fresh = ALL_PLAYERS.find(p=>p.id===ME.id);
+      if(fresh) ME = {...fresh};
+    }
+    renderAll();
+  }, 15000);
+}
+
+boot();
+
 </script>
 </body>
 </html>
