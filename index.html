@@ -962,23 +962,44 @@ function resolveKOTeams(user){
     if(st && st[2]) third3rdTeams[gk] = st[2].team;
   });
 
-  // Assign 3rd place teams to slots — greedy: highest-ranked eligible team per slot, no repeats
-  const assigned3rd = {}; // matchId -> team
+  // Assign 3rd place teams to slots using optimal matching
+  // This mirrors FIFA Annex C: each qualified team goes to exactly one slot
+  const assigned3rd = {};
   const usedGroups = new Set();
-
-  // Process slots in ranking order of the top-ranked eligible team
   const thirdSlots = KNOCKOUT_MATCHES.filter(m => m.round==='R32' && m.seedT2 && m.seedT2.startsWith('3') && m.seedT2.length > 2);
 
-  // Sort slots by which has the highest-ranked eligible team (so best teams get placed first)
+  // Build eligibility map: slot -> eligible qualified groups
+  const slotEligible = {};
   thirdSlots.forEach(m => {
-    const eligibleGroups = m.seedT2.slice(1).split('');
-    // Find highest-ranked eligible unassigned group
-    for(const gk of qualified3rd){
-      if(eligibleGroups.includes(gk) && !usedGroups.has(gk) && third3rdTeams[gk]){
-        assigned3rd[m.id] = third3rdTeams[gk];
-        usedGroups.add(gk);
-        break;
+    slotEligible[m.id] = m.seedT2.slice(1).split('').filter(gk => qualified3rd.includes(gk) && third3rdTeams[gk]);
+  });
+
+  // Iteratively assign: each pass, assign slots that have only ONE eligible option
+  // Then assign remaining by highest-ranked team
+  let changed = true;
+  while(changed){
+    changed = false;
+    // First pass: assign slots with exactly one eligible unassigned group
+    thirdSlots.forEach(m => {
+      if(assigned3rd[m.id]) return;
+      const avail = slotEligible[m.id].filter(gk => !usedGroups.has(gk));
+      if(avail.length === 1){
+        assigned3rd[m.id] = third3rdTeams[avail[0]];
+        usedGroups.add(avail[0]);
+        changed = true;
       }
+    });
+  }
+
+  // Second pass: assign remaining slots by user's ranking order
+  thirdSlots.forEach(m => {
+    if(assigned3rd[m.id]) return;
+    const avail = slotEligible[m.id].filter(gk => !usedGroups.has(gk));
+    // Pick highest ranked available
+    avail.sort((a,b) => qualified3rd.indexOf(a) - qualified3rd.indexOf(b));
+    if(avail.length > 0){
+      assigned3rd[m.id] = third3rdTeams[avail[0]];
+      usedGroups.add(avail[0]);
     }
   });
 
