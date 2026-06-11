@@ -900,12 +900,7 @@ function resolveTeam(seed, standings, user, adminOverrides){
     if(!st) return 'TBD';
     // Only resolve if user has picked all 3 matches in this group
     // (if actual results exist for all 3, those count too)
-    const groupMatchIds = GROUP_MATCHES.filter(m=>m.group===gk).map(m=>m.id);
     const _uname = typeof user==='object'?user?.realName:user;
-    // Use ME.groupPicks directly if this is the current user (most up-to-date)
-    const gp = (ME && ME.realName===_uname) ? (ME.groupPicks||{}) : (ALL_PLAYERS.find(p=>p.realName===_uname||p.id===_uname)||{}).groupPicks||{};
-    const allPicked = groupMatchIds.every(id => ST.results[id]!==undefined || gp[id]);
-    if(!allPicked) return 'TBD';
     // check tiebreak overrides
     const tieKey = `tie_${gk}_${rank}`;
     if(adminOverrides[tieKey]) return adminOverrides[tieKey];
@@ -1608,7 +1603,7 @@ const ALL_TEAMS = Object.values(GROUPS).flatMap(g=>g.teams).sort();
 const TOP_SCORERS = [
   'Kylian Mbappé','Erling Haaland','Vinicius Jr.','Lionel Messi','Cristiano Ronaldo',
   'Harry Kane','Lautaro Martínez','Antoine Griezmann','Bukayo Saka','Phil Foden',
-  'Pedri','Gavi','Federico Valverde','Jude Bellingham','Lamine Yamal',
+  'Pedri','Gavi','Federico Valverde','Jude Bellingham','Lamine Yamal','Kenan Yıldız',
   'Marcus Rashford','Leroy Sané','Jamal Musiala','Rafael Leão','Bernardo Silva',
   'Romelu Lukaku','Robert Lewandowski','Memphis Depay','Cody Gakpo','Wout Weghorst',
   'Mohammed Salah','Sadio Mané','Achraf Hakimi','Youssef En-Nesyri','Dani Olmo',
