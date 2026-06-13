@@ -1560,8 +1560,7 @@ function renderMyPicks(){
     const res = ST.results[m.id];
     let badge='<span class="badge bup">Pending</span>';
     if(res){
-      const actualPick = res.winner===m.t1?'w1':res.winner===m.t2?'w2':'draw';
-      badge = actualPick===pick ? '<span class="badge bdone">✓ Correct</span>' : '<span class="badge blive">✗ Wrong</span>';
+      badge = res.winner===pick ? '<span class="badge bdone">✓ Correct</span>' : '<span class="badge blive">✗ Wrong</span>';
     }
     const label = pick==='w1'?`${fl(m.t1)} ${m.t1} Win`:pick==='w2'?`${fl(m.t2)} ${m.t2} Win`:`Draw`;
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px;">
