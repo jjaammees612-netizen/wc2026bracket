@@ -1727,7 +1727,7 @@ function renderBonus(){
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;color:var(--muted2)">
           <span>Group stage correct</span><span style="color:var(--text);font-weight:600">+1 pt</span>
           <span>Knockout correct</span><span style="color:var(--text);font-weight:600">+2 pts</span>
-          <span>Perfect matchday</span><span style="color:var(--gold);font-weight:600">+3 pts</span>
+          <span>Perfect matchday</span><span style="color:var(--gold);font-weight:600">2x score</span>
           <span>Perfect group table</span><span style="color:var(--gold);font-weight:600">+3 pts</span>
           <span>Champion pick</span><span style="color:var(--gold);font-weight:600">+15 pts</span>
           <span>Golden Boot pick</span><span style="color:var(--gold);font-weight:600">+10 pts</span>
@@ -1737,7 +1737,7 @@ function renderBonus(){
       <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin-bottom:16px" id="third-rank-card">
         <div style="margin-bottom:14px">
           <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px">🔀 3RD PLACE QUALIFIERS</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px">Drag to rank all 12 third-place teams. <strong style="color:var(--text)">Top 8 advance</strong> to the Round of 32.</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px"><strong style="color:var(--text)">Top 8 advance</strong> to the Round of 32.</div>
         </div>
         <div id="third-rank-list" style="display:flex;flex-direction:column;gap:6px"></div>
         ${!locked?`<div style="font-size:11px;color:var(--muted);margin-top:10px">Drag rows to reorder · your ranking seeds your knockout bracket</div>`:''}
