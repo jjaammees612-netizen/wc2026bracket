@@ -1391,9 +1391,9 @@ function renderGroupMatch(m, locked){
   const winner = res?.winner;
   const hasResult = res !== undefined;
 
-  const t1picked = hasResult ? winner===m.t1 : userPick==='w1';
-  const t2picked = hasResult ? winner===m.t2 : userPick==='w2';
-  const drawpicked = hasResult ? winner===null : userPick==='draw';
+  const t1picked = hasResult ? winner==='w1' : userPick==='w1';
+  const t2picked = hasResult ? winner==='w2' : userPick==='w2';
+  const drawpicked = hasResult ? (winner==='draw'||winner===null) : userPick==='draw';
 
   const t1style = t1picked ? 'background:rgba(16,185,129,.15);border-color:var(--green);' : (t2picked||drawpicked) ? 'opacity:.38;' : '';
   const t2style = t2picked ? 'background:rgba(16,185,129,.15);border-color:var(--green);' : (t1picked||drawpicked) ? 'opacity:.38;' : '';
@@ -1629,7 +1629,7 @@ function renderFriends(){
     const pick=gp[m.id];if(!pick)return'';
     const res=ST.results[m.id];
     let badge='<span class="badge bup">Pending</span>';
-    if(res){const ap=res.winner===m.t1?'w1':res.winner===m.t2?'w2':'draw';badge=ap===pick?'<span class="badge bdone">✓</span>':'<span class="badge blive">✗</span>';}
+    if(res){badge=res.winner===pick?'<span class="badge bdone">✓</span>':'<span class="badge blive">✗</span>';}
     const label=pick==='w1'?`${fl(m.t1)} Win`:pick==='w2'?`${fl(m.t2)} Win`:'Draw';
     return `<div style="display:flex;justify-content:space-between;padding:7px 12px;border-bottom:1px solid var(--border);font-size:12px;align-items:center">
       <span style="color:var(--muted)">${m.id}</span><span>${label}</span>${badge}</div>`;
