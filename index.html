@@ -1,17 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
+<!-- saved from url=(0053)file:///Users/pranay/Downloads/wc2026-bracket_51.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="WC2026">
 <meta name="theme-color" content="#0d1117">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230d1117'/><text y='.9em' font-size='80' x='50%' text-anchor='middle'>⚽</text></svg>">
+<link rel="apple-touch-icon" href="data:image/svg+xml,&lt;svg xmlns=&#39;http://www.w3.org/2000/svg&#39; viewBox=&#39;0 0 100 100&#39;&gt;&lt;rect width=&#39;100&#39; height=&#39;100&#39; rx=&#39;20&#39; fill=&#39;%230d1117&#39;/&gt;&lt;text y=&#39;.9em&#39; font-size=&#39;80&#39; x=&#39;50%&#39; text-anchor=&#39;middle&#39;&gt;%E2%9A%BD&lt;/text&gt;&lt;/svg&gt;">
 <title>WC 2026 Bracket Battle</title>
-<link rel="manifest" href="/manifest.json">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="manifest" href="file:///manifest.json">
+<link href="./WC 2026 Bracket Battle_files/css2" rel="stylesheet">
 
 <style>
 :root {
@@ -250,14 +250,14 @@ const supabase = {
 <body>
 
 <!-- MODAL -->
-<div id="modal">
+<div id="modal" style="display: flex;">
   <div class="mbox">
     <!-- SCREEN 1: Welcome -->
-    <div id="modal-screen-1">
+    <div id="modal-screen-1" style="display: block;">
       <div class="mflag">⚽</div>
       <div class="mtitle">WC 2026 Bracket Battle</div>
       <div class="msub">48 teams · 104 matches · one winner</div>
-      <div id="player-count-display" style="font-size:12px;color:var(--muted2);margin-bottom:8px"></div>
+      <div id="player-count-display" style="font-size:12px;color:var(--muted2);margin-bottom:8px">10/10 players joined</div>
       <div class="buyin">💵 $10 Buy-In · 10 Players</div>
       <div class="prizes">
         <div class="pcard"><div class="pplace">🥇 1st</div><div class="pamount">$50</div><div class="plabel">Winner</div></div>
@@ -276,25 +276,22 @@ const supabase = {
       <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;text-align:left">
         <div>
           <label style="font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">Your Real Name</label>
-          <input id="input-realname" type="text" placeholder="e.g. Pranay" maxlength="30"
-            style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:15px;">
+          <input id="input-realname" type="text" placeholder="e.g. Pranay" maxlength="30" style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:&#39;DM Sans&#39;,sans-serif;font-size:15px;">
         </div>
         <div>
           <label style="font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">Your Team Name <span style="color:var(--muted);font-weight:400;text-transform:none">(fun alias for the leaderboard)</span></label>
-          <input id="input-teamname" type="text" placeholder="e.g. Messi's Accountant" maxlength="30"
-            style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:15px;">
+          <input id="input-teamname" type="text" placeholder="e.g. Messi&#39;s Accountant" maxlength="30" style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:&#39;DM Sans&#39;,sans-serif;font-size:15px;">
         </div>
         <div>
           <label style="font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">Set a 4-digit PIN <span style="color:var(--muted);font-weight:400;text-transform:none">(to protect your bracket)</span></label>
-          <input id="input-pin" type="password" inputmode="numeric" placeholder="e.g. 1234" maxlength="4" pattern="[0-9]{4}"
-            style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:15px;letter-spacing:6px;">
+          <input id="input-pin" type="password" inputmode="numeric" placeholder="e.g. 1234" maxlength="4" pattern="[0-9]{4}" style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:&#39;DM Sans&#39;,sans-serif;font-size:15px;letter-spacing:6px;">
         </div>
       </div>
       <div id="modal-error" style="color:var(--red);font-size:12px;margin-bottom:12px;display:none"></div>
-      <button class="mbtn" onclick="submitIdentity()">Save & Enter Bracket →</button>
+      <button class="mbtn" onclick="submitIdentity()">Save &amp; Enter Bracket →</button>
       <div style="margin-top:14px">
         <span style="font-size:12px;color:var(--muted)">Returning? </span>
-        <button onclick="showModalScreen(3)" style="background:none;border:none;color:var(--green);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;text-decoration:underline">Restore my bracket</button>
+        <button onclick="showModalScreen(3)" style="background:none;border:none;color:var(--green);font-size:12px;cursor:pointer;font-family:&#39;DM Sans&#39;,sans-serif;text-decoration:underline">Restore my bracket</button>
       </div>
     </div>
 
@@ -306,19 +303,17 @@ const supabase = {
       <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px;text-align:left">
         <div>
           <label style="font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">Your Real Name</label>
-          <input id="input-restore" type="text" placeholder="e.g. Pranay" maxlength="30"
-            style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:15px;">
+          <input id="input-restore" type="text" placeholder="e.g. Pranay" maxlength="30" style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:&#39;DM Sans&#39;,sans-serif;font-size:15px;">
         </div>
         <div>
           <label style="font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:6px">Your PIN</label>
-          <input id="input-restore-pin" type="password" inputmode="numeric" placeholder="4-digit PIN" maxlength="4"
-            style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:15px;letter-spacing:6px;">
+          <input id="input-restore-pin" type="password" inputmode="numeric" placeholder="4-digit PIN" maxlength="4" style="width:100%;background:#1c1c1c;border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:8px;font-family:&#39;DM Sans&#39;,sans-serif;font-size:15px;letter-spacing:6px;">
         </div>
       </div>
       <div id="restore-error" style="color:var(--red);font-size:12px;margin-bottom:12px;display:none"></div>
       <button class="mbtn" onclick="restoreByName()">Restore →</button>
       <div style="margin-top:14px">
-        <button onclick="showModalScreen(2)" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">← Back</button>
+        <button onclick="showModalScreen(2)" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:&#39;DM Sans&#39;,sans-serif">← Back</button>
       </div>
     </div>
   </div>
@@ -333,19 +328,19 @@ const supabase = {
   <div class="hright">
     <div id="header-user" style="display:flex;align-items:center;gap:8px">
       <div id="header-name" style="font-size:13px;color:var(--muted)">Not signed in</div>
-      <button onclick="switchPlayer()" style="background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;">Switch</button>
+      <button onclick="switchPlayer()" style="background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:&#39;DM Sans&#39;,sans-serif;">Switch</button>
     </div>
   </div>
 </header>
 
 <!-- TABS -->
 <div class="tabs">
-  <div class="tab active" onclick="switchTab('groups')">📊 Groups</div>
-  <div class="tab" onclick="switchTab('knockout')">🏆 Knockout</div>
-  <div class="tab" onclick="switchTab('bonus')">⭐ Bonus</div>
-  <div class="tab" onclick="switchTab('mypicks')">🎯 My Picks</div>
-  <div class="tab" onclick="switchTab('friends')">👥 Friends</div>
-  <div class="tab" onclick="switchTab('leaderboard')">📈 Standings</div>
+  <div class="tab active" onclick="switchTab(&#39;groups&#39;)">📊 Groups</div>
+  <div class="tab" onclick="switchTab(&#39;knockout&#39;)">🏆 Knockout</div>
+  <div class="tab" onclick="switchTab(&#39;bonus&#39;)">⭐ Bonus</div>
+  <div class="tab" onclick="switchTab(&#39;mypicks&#39;)">🎯 My Picks</div>
+  <div class="tab" onclick="switchTab(&#39;friends&#39;)">👥 Friends</div>
+  <div class="tab" onclick="switchTab(&#39;leaderboard&#39;)">📈 Standings</div>
 </div>
 
 <!-- MAIN -->
@@ -1104,6 +1099,7 @@ function checkPerfectMatchdays(user){
   const gp = playerPM.groupPicks||{};
   const days = getMatchdays();
   let perfect = 0;
+  let bonusPts = 0;
   Object.entries(days).forEach(([date, ids])=>{
     const played = ids.filter(id=>ST.results[id]!==undefined);
     if(played.length===0 || played.length<ids.length) return; // day not complete
@@ -1111,12 +1107,11 @@ function checkPerfectMatchdays(user){
       const res = ST.results[id];
       const pick = gp[id];
       if(!pick) return false;
-      const actual = res.winner===GROUP_MATCHES.find(m=>m.id===id)?.t1?'w1':res.winner===GROUP_MATCHES.find(m=>m.id===id)?.t2?'w2':'draw';
-      return actual===pick;
+      return res.winner===pick;
     });
-    if(allCorrect) perfect++;
+    if(allCorrect){ perfect++; bonusPts += played.length; }
   });
-  return perfect;
+  return {count: perfect, bonusPts};
 }
 
 function checkPerfectGroups(user){
@@ -1153,8 +1148,7 @@ function calcScore(user){
     if(pick) picks++;
     if(res!==undefined && pick){
       judged++;
-      const actualPick = res.winner===m.t1?'w1':res.winner===m.t2?'w2':'draw';
-      if(actualPick===pick){correct++;pts+=1;}
+      if(res.winner===pick){correct++;pts+=1;}
     }
   });
 
@@ -1183,16 +1177,17 @@ function calcScore(user){
     if(ST.actualTopScorer===bp.topScorer){correct++;pts+=10;}
   }
 
-  // Perfect matchday bonuses — +3pts each
-  const perfectDays = checkPerfectMatchdays(user);  // user is already a realName string here
-  pts += perfectDays * 3;
+  // Perfect matchday bonuses — +1pt per match played that day, if all correct
+  const pmResult = checkPerfectMatchdays(user);  // user is already a realName string here
+  const perfectDays = pmResult.count;
+  pts += pmResult.bonusPts;
 
   // Perfect group bonuses — +3pts each
   const perfectGroups = checkPerfectGroups(user);
   pts += perfectGroups * 3;
 
   const pct = judged>0?Math.round(correct/judged*100):0;
-  return {pts, correct, judged, picks, pct, perfectDays, perfectGroups};
+  return {pts, correct, judged, picks, pct, perfectDays, perfectDaysBonus: pmResult.bonusPts, perfectGroups};
 }
 
 // ====================================================
@@ -1554,7 +1549,7 @@ function renderMyPicks(){
       <div><div class="ppnum" style="color:var(--gold)">${groupPicked}/${totalGroupMatches}</div><div class="pplabel">Picks Made</div></div>
     </div>
     ${sc.perfectDays>0||sc.perfectGroups>0?`<div style="background:rgba(255,215,0,.06);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;display:flex;gap:20px;flex-wrap:wrap">
-      ${sc.perfectDays>0?`<span>🎯 <strong style="color:var(--gold)">${sc.perfectDays}</strong> perfect matchday${sc.perfectDays>1?'s':''} (+${sc.perfectDays*3}pts)</span>`:''}
+      ${sc.perfectDays>0?`<span>🎯 <strong style="color:var(--gold)">${sc.perfectDays}</strong> perfect matchday${sc.perfectDays>1?'s':''} (+${sc.perfectDaysBonus}pts)</span>`:''}
       ${sc.perfectGroups>0?`<span>🏆 <strong style="color:var(--gold)">${sc.perfectGroups}</strong> perfect group${sc.perfectGroups>1?'s':''} (+${sc.perfectGroups*3}pts)</span>`:''}
     </div>`:''}`;
 
@@ -1923,5 +1918,5 @@ async function boot(){
 boot();
 
 </script>
-</body>
-</html>
+
+</body></html>
