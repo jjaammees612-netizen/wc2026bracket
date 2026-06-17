@@ -489,7 +489,7 @@ const GROUP_MATCHES = [
   {id:'H5',group:'H',t1:'Cape Verde',t2:'Saudi Arabia',date:'Jun 25'},
   {id:'H6',group:'H',t1:'Uruguay',t2:'Spain',date:'Jun 25'},
   // Group I
-  {id:'I1',group:'I',t1:'France',t2:'Senegal',date:'Jun 15'},
+  {id:'I1',group:'I',t1:'France',t2:'Senegal',date:'Jun 16'},
   {id:'I2',group:'I',t1:'Iraq',t2:'Norway',date:'Jun 16'},
   {id:'I3',group:'I',t1:'France',t2:'Iraq',date:'Jun 21'},
   {id:'I4',group:'I',t1:'Norway',t2:'Senegal',date:'Jun 21'},
@@ -503,8 +503,8 @@ const GROUP_MATCHES = [
   {id:'J5',group:'J',t1:'Algeria',t2:'Austria',date:'Jun 26'},
   {id:'J6',group:'J',t1:'Jordan',t2:'Argentina',date:'Jun 26'},
   // Group K
-  {id:'K1',group:'K',t1:'Portugal',t2:'DR Congo',date:'Jun 16'},
-  {id:'K2',group:'K',t1:'Uzbekistan',t2:'Colombia',date:'Jun 16'},
+  {id:'K1',group:'K',t1:'Portugal',t2:'DR Congo',date:'Jun 17'},
+  {id:'K2',group:'K',t1:'Uzbekistan',t2:'Colombia',date:'Jun 17'},
   {id:'K3',group:'K',t1:'Portugal',t2:'Uzbekistan',date:'Jun 21'},
   {id:'K4',group:'K',t1:'Colombia',t2:'DR Congo',date:'Jun 21'},
   {id:'K5',group:'K',t1:'DR Congo',t2:'Uzbekistan',date:'Jun 26'},
@@ -1390,29 +1390,39 @@ function renderGroupMatch(m, locked){
   const userPick = ME?(ME.groupPicks||{})[m.id]:null;
   const winner = res?.winner;
   const hasResult = res !== undefined;
+  const isDraw = winner==='draw'||winner===null;
 
-  const t1picked = hasResult ? winner==='w1' : userPick==='w1';
-  const t2picked = hasResult ? winner==='w2' : userPick==='w2';
-  const drawpicked = hasResult ? (winner==='draw'||winner===null) : userPick==='draw';
+  const t1picked = !hasResult && userPick==='w1';
+  const t2picked = !hasResult && userPick==='w2';
+  const drawpicked = !hasResult && userPick==='draw';
 
   const t1style = t1picked ? 'background:rgba(16,185,129,.15);border-color:var(--green);' : (t2picked||drawpicked) ? 'opacity:.38;' : '';
   const t2style = t2picked ? 'background:rgba(16,185,129,.15);border-color:var(--green);' : (t1picked||drawpicked) ? 'opacity:.38;' : '';
   const vsstyle = drawpicked ? 'background:rgba(245,158,11,.12);color:var(--gold);font-weight:800;border-radius:6px;padding:3px 8px;' : '';
 
-  const t1click = hasResult ? `setResult('${m.id}','${m.t1}','${m.t2}','w1')` : !locked ? `groupPick('${m.id}','w1')` : '';
-  const t2click = hasResult ? `setResult('${m.id}','${m.t1}','${m.t2}','w2')` : !locked ? `groupPick('${m.id}','w2')` : '';
-  const vsclick = hasResult ? `setResult('${m.id}','${m.t1}','${m.t2}','draw')` : !locked ? `groupPick('${m.id}','draw')` : '';
+  const t1click = hasResult || (!locked) ? true : false;
+  const t2click = t1click;
+  const vsclick = t1click;
 
+  // Result badge — single source of truth for what actually happened
   const badge = hasResult
-    ? `<span class="badge bdone">✓ ${winner===null?'Draw':winner}</span>`
+    ? `<span class="badge bdone">FT: ${isDraw?'Draw':(winner==='w1'?m.t1:m.t2)}</span>`
     : locked ? `<span class="badge blocked">🔒</span>`
-    : userPick ? `<span class="badge bdone">✓</span>`
+    : userPick ? `<span class="badge bdone">✓ Picked</span>`
     : `<span class="badge bup">Pick</span>`;
 
+  // Subtle marker on the winning team row (no full highlight, avoids duplicating the badge)
+  const t1won = hasResult && winner==='w1' ? ' <span style="font-size:11px;color:var(--green)">●</span>' : '';
+  const t2won = hasResult && winner==='w2' ? ' <span style="font-size:11px;color:var(--green)">●</span>' : '';
+
   const pickLabel = userPick==='w1'?m.t1:userPick==='w2'?m.t2:userPick==='draw'?'Draw':null;
-  const pickCorrect = hasResult && userPick ? (userPick===winner || (userPick==='draw' && (winner===null||winner==='draw'))) : null;
+  const pickCorrect = hasResult && userPick ? (userPick===winner || (userPick==='draw' && isDraw)) : null;
   const yourPick = (hasResult && pickLabel)
-    ? `<div style="font-size:10px;color:var(--muted);text-align:center;margin-top:5px;letter-spacing:.3px">Your pick: <strong style="color:${pickCorrect?'var(--green)':'var(--red, #ef4444)'}">${pickLabel}</strong> ${pickCorrect?'✓':'✗'}</div>`
+    ? `<div style="margin-top:8px;padding:6px 10px;border-radius:6px;font-size:11px;text-align:center;font-weight:600;letter-spacing:.3px;
+        background:${pickCorrect?'rgba(16,185,129,.12)':'rgba(239,68,68,.10)'};
+        color:${pickCorrect?'var(--green)':'#ef4444'}">
+        Your pick: ${pickLabel} — ${pickCorrect?'✓ Correct':'✗ Wrong'}
+      </div>`
     : '';
 
   const hint = !hasResult && !locked
@@ -1421,25 +1431,24 @@ function renderGroupMatch(m, locked){
 
   const grpbadge = `<span style="font-size:9px;background:rgba(255,255,255,.06);color:var(--muted2);padding:2px 6px;border-radius:4px;font-weight:600">GRP ${m.group}</span>`;
 
-  // Use data attributes to avoid quote escaping issues
   return `<div class="mcard" style="${(userPick||hasResult)?'border-color:#253040;':''}">
     <div class="mlabel"><span>${grpbadge}</span><span class="mdate">${m.date||''}</span>${badge}</div>
     <div class="mteams">
       <div class="trow" style="cursor:${t1click?'pointer':'default'};${t1style}"
         data-mid="${m.id}" data-t1="${m.t1}" data-t2="${m.t2}" data-outcome="w1" data-hasresult="${hasResult}" data-locked="${locked}"
         onclick="handleMatchClick(this)">
-        <div class="tname"><span class="tflag">${fl(m.t1)}</span>${m.t1}</div>
+        <div class="tname"><span class="tflag">${fl(m.t1)}</span>${m.t1}${t1won}</div>
         ${t1picked?'<span style="font-size:12px;color:var(--green);font-weight:700">✓</span>':''}
       </div>
       <div class="vsline" style="cursor:${vsclick?'pointer':'default'};${vsstyle}"
         data-mid="${m.id}" data-t1="${m.t1}" data-t2="${m.t2}" data-outcome="draw" data-hasresult="${hasResult}" data-locked="${locked}"
         onclick="handleMatchClick(this)">
-        ${drawpicked?'DRAW ✓':'VS'}
+        VS
       </div>
       <div class="trow" style="cursor:${t2click?'pointer':'default'};${t2style}"
         data-mid="${m.id}" data-t1="${m.t1}" data-t2="${m.t2}" data-outcome="w2" data-hasresult="${hasResult}" data-locked="${locked}"
         onclick="handleMatchClick(this)">
-        <div class="tname"><span class="tflag">${fl(m.t2)}</span>${m.t2}</div>
+        <div class="tname"><span class="tflag">${fl(m.t2)}</span>${m.t2}${t2won}</div>
         ${t2picked?'<span style="font-size:12px;color:var(--green);font-weight:700">✓</span>':''}
       </div>
     </div>
@@ -1738,15 +1747,6 @@ function renderBonus(){
           <span>Champion pick</span><span style="color:var(--gold);font-weight:600">+15 pts</span>
           <span>Golden Boot pick</span><span style="color:var(--gold);font-weight:600">+10 pts</span>
         </div>
-      </div>
-
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin-bottom:16px" id="third-rank-card">
-        <div style="margin-bottom:14px">
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px">🔀 3RD PLACE QUALIFIERS</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px"><strong style="color:var(--text)">Top 8 advance</strong> to the Round of 32.</div>
-        </div>
-        <div id="third-rank-list" style="display:flex;flex-direction:column;gap:6px"></div>
-        ${!locked?`<div style="font-size:11px;color:var(--muted);margin-top:10px">Drag rows to reorder · your ranking seeds your knockout bracket</div>`:''}
       </div>
 
       <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin-bottom:16px">
