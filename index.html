@@ -1418,11 +1418,7 @@ function renderGroupMatch(m, locked){
   const pickLabel = userPick==='w1'?m.t1:userPick==='w2'?m.t2:userPick==='draw'?'Draw':null;
   const pickCorrect = hasResult && userPick ? (userPick===winner || (userPick==='draw' && isDraw)) : null;
   const yourPick = (hasResult && pickLabel)
-    ? `<div style="margin-top:8px;padding:6px 10px;border-radius:6px;font-size:11px;text-align:center;font-weight:600;letter-spacing:.3px;
-        background:${pickCorrect?'rgba(16,185,129,.12)':'rgba(239,68,68,.10)'};
-        color:${pickCorrect?'var(--green)':'#ef4444'}">
-        Your pick: ${pickLabel} — ${pickCorrect?'✓ Correct':'✗ Wrong'}
-      </div>`
+    ? `<div style="font-size:10px;color:var(--muted);text-align:center;margin-top:5px;letter-spacing:.3px">Your pick: <strong style="color:${pickCorrect?'var(--green)':'#ef4444'}">${pickLabel}</strong> ${pickCorrect?'✓':'✗'}</div>`
     : '';
 
   const hint = !hasResult && !locked
@@ -1640,14 +1636,21 @@ function renderFriends(){
     return;
   }
 
-  const gpRows = GROUP_MATCHES.map(m=>{
+  const sortedMatches = [...GROUP_MATCHES].sort((a,b)=>{
+    const dateA = new Date(a.date+' 2026');
+    const dateB = new Date(b.date+' 2026');
+    if(dateA-dateB!==0) return dateA-dateB;
+    return a.id.localeCompare(b.id);
+  });
+
+  const gpRows = sortedMatches.map(m=>{
     const pick=gp[m.id];if(!pick)return'';
     const res=ST.results[m.id];
     let badge='<span class="badge bup">Pending</span>';
     if(res){badge=res.winner===pick?'<span class="badge bdone">✓</span>':'<span class="badge blive">✗</span>';}
     const label=pick==='w1'?`${fl(m.t1)} Win`:pick==='w2'?`${fl(m.t2)} Win`:'Draw';
     return `<div style="display:flex;justify-content:space-between;padding:7px 12px;border-bottom:1px solid var(--border);font-size:12px;align-items:center">
-      <span style="color:var(--muted)">${m.id}</span><span>${label}</span>${badge}</div>`;
+      <span style="color:var(--muted)">${m.date} · ${m.id}</span><span>${label}</span>${badge}</div>`;
   }).filter(Boolean).join('');
 
   fd.innerHTML=`<div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--muted);margin-bottom:12px">${friendPlayer.teamName}'s picks</div>
