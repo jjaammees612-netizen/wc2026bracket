@@ -860,16 +860,9 @@ function computeStandings(user){
     teams.forEach(t=>{table[t]={team:t,pts:0,w:0,d:0,l:0,gf:0,ga:0,gd:0};});
     const gmatches = GROUP_MATCHES.filter(m=>m.group===gk);
     gmatches.forEach(m=>{
-      const result = ST.results[m.id];
-      if(result){
-        const {winner} = result;
-        if(winner==='w1'){table[m.t1].pts+=3;table[m.t1].w++;table[m.t2].l++;}
-        else if(winner==='w2'){table[m.t2].pts+=3;table[m.t2].w++;table[m.t1].l++;}
-        else{table[m.t1].pts+=1;table[m.t1].d++;table[m.t2].pts+=1;table[m.t2].d++;}
-      } else if(user){
-        // Use user's pick
+      if(user){
+        // Always use user's picks for the predicted table
         const playerName = typeof user === 'object' ? user?.realName : user;
-        // Use ME.groupPicks directly if current user for freshest data
         const gpSource = (ME && ME.realName===playerName) ? ME.groupPicks : (ALL_PLAYERS.find(p=>p.realName===playerName||p.id===playerName)||{}).groupPicks||{};
         const pick = (gpSource||{})[m.id];
         if(pick==='w1'){table[m.t1].pts+=3;table[m.t1].w++;table[m.t2].l++;}
