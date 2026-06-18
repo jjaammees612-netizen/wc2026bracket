@@ -435,8 +435,8 @@ const GROUP_MATCHES = [
   // Group A
   {id:'A1',group:'A',t1:'Mexico',t2:'South Africa',date:'Jun 11'},
   {id:'A2',group:'A',t1:'South Korea',t2:'Czech Republic',date:'Jun 11'},
-  {id:'A3',group:'A',t1:'Mexico',t2:'South Korea',date:'Jun 17'},
-  {id:'A4',group:'A',t1:'Czech Republic',t2:'South Africa',date:'Jun 17'},
+  {id:'A3',group:'A',t1:'Mexico',t2:'South Korea',date:'Jun 18'},
+  {id:'A4',group:'A',t1:'Czech Republic',t2:'South Africa',date:'Jun 18'},
   {id:'A5',group:'A',t1:'South Africa',t2:'South Korea',date:'Jun 22'},
   {id:'A6',group:'A',t1:'Czech Republic',t2:'Mexico',date:'Jun 22'},
   // Group B
@@ -449,8 +449,8 @@ const GROUP_MATCHES = [
   // Group C
   {id:'C1',group:'C',t1:'Brazil',t2:'Morocco',date:'Jun 13'},
   {id:'C2',group:'C',t1:'Haiti',t2:'Scotland',date:'Jun 13'},
-  {id:'C3',group:'C',t1:'Brazil',t2:'Haiti',date:'Jun 18'},
-  {id:'C4',group:'C',t1:'Scotland',t2:'Morocco',date:'Jun 18'},
+  {id:'C3',group:'C',t1:'Brazil',t2:'Haiti',date:'Jun 19'},
+  {id:'C4',group:'C',t1:'Scotland',t2:'Morocco',date:'Jun 19'},
   {id:'C5',group:'C',t1:'Morocco',t2:'Haiti',date:'Jun 23'},
   {id:'C6',group:'C',t1:'Scotland',t2:'Brazil',date:'Jun 23'},
   // Group D
@@ -1640,7 +1640,7 @@ function renderFriends(){
     const dateA = new Date(a.date+' 2026');
     const dateB = new Date(b.date+' 2026');
     if(dateA-dateB!==0) return dateA-dateB;
-    return a.id.localeCompare(b.id);
+    return GROUP_MATCHES.indexOf(a) - GROUP_MATCHES.indexOf(b);
   });
 
   const gpRows = sortedMatches.map(m=>{
