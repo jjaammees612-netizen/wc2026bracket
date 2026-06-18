@@ -963,12 +963,18 @@ function resolveKOTeams(user){
     slotEligible[m.id] = m.seedT2.slice(1).split('').filter(gk => qualified3rd.includes(gk) && third3rdTeams[gk]);
   });
 
-  // Iteratively resolve forced assignments (slots/groups with only one option)
+  // Iteratively resolve forced assignments using most-constrained-first
   let changed = true;
   while(changed){
     changed = false;
-    // Assign slots that have only one available group
-    thirdSlots.forEach(m => {
+    // Sort slots by number of available groups (most constrained first)
+    const unresolved = thirdSlots.filter(m => !assigned3rd[m.id]);
+    unresolved.sort((a,b) => {
+      const aAvail = slotEligible[a.id].filter(gk => !usedGroups.has(gk)).length;
+      const bAvail = slotEligible[b.id].filter(gk => !usedGroups.has(gk)).length;
+      return aAvail - bAvail;
+    });
+    unresolved.forEach(m => {
       if(assigned3rd[m.id]) return;
       const avail = slotEligible[m.id].filter(gk => !usedGroups.has(gk));
       if(avail.length === 1){
