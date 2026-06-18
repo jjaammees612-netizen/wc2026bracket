@@ -863,8 +863,8 @@ function computeStandings(user){
       const result = ST.results[m.id];
       if(result){
         const {winner} = result;
-        if(winner===m.t1){table[m.t1].pts+=3;table[m.t1].w++;table[m.t2].l++;}
-        else if(winner===m.t2){table[m.t2].pts+=3;table[m.t2].w++;table[m.t1].l++;}
+        if(winner==='w1'){table[m.t1].pts+=3;table[m.t1].w++;table[m.t2].l++;}
+        else if(winner==='w2'){table[m.t2].pts+=3;table[m.t2].w++;table[m.t1].l++;}
         else{table[m.t1].pts+=1;table[m.t1].d++;table[m.t2].pts+=1;table[m.t2].d++;}
       } else if(user){
         // Use user's pick
