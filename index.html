@@ -396,7 +396,7 @@ const supabase = {
 // ====================================================
 // TOURNAMENT DATA
 // ====================================================
-const LOCK_DATE = new Date('2026-06-11T19:00:00Z'); // Jun 11 3PM ET = 19:00 UTC
+const LOCK_DATE = new Date('2026-06-23T23:59:00Z'); // Temporarily extended to Jun 23 for group ordering
 
 const GROUPS = {
   A:{name:'A',teams:['Mexico','South Africa','South Korea','Czech Republic']},
@@ -977,7 +977,8 @@ function resolveKOTeams(user){
     unresolved.forEach(m => {
       if(assigned3rd[m.id]) return;
       const avail = slotEligible[m.id].filter(gk => !usedGroups.has(gk));
-      if(avail.length === 1){
+      if(avail.length >= 1){
+        avail.sort((a,b) => qualified3rd.indexOf(a) - qualified3rd.indexOf(b));
         assigned3rd[m.id] = third3rdTeams[avail[0]];
         usedGroups.add(avail[0]);
         changed = true;
