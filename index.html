@@ -500,8 +500,8 @@ const GROUP_MATCHES = [
   {id:'J2',group:'J',t1:'Austria',t2:'Jordan',date:'Jun 16'},
   {id:'J3',group:'J',t1:'Argentina',t2:'Austria',date:'Jun 22'},
   {id:'J4',group:'J',t1:'Jordan',t2:'Algeria',date:'Jun 22'},
-  {id:'J5',group:'J',t1:'Algeria',t2:'Austria',date:'Jun 26'},
-  {id:'J6',group:'J',t1:'Jordan',t2:'Argentina',date:'Jun 26'},
+  {id:'J5',group:'J',t1:'Algeria',t2:'Austria',date:'Jun 27'},
+  {id:'J6',group:'J',t1:'Jordan',t2:'Argentina',date:'Jun 27'},
   // Group K
   {id:'K1',group:'K',t1:'Portugal',t2:'DR Congo',date:'Jun 17'},
   {id:'K2',group:'K',t1:'Uzbekistan',t2:'Colombia',date:'Jun 17'},
@@ -1992,6 +1992,8 @@ function renderKOMatch(m){
     ? `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:6px">tap to change result</div>`
     : !userPick ? `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:6px">tap team to pick</div>` : '';
 
+  const seedLabel = m.seedT1 ? `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.3px">${m.seedT1} vs ${m.seedT2}</div>` : m.r32a ? `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.3px">W${m.r32a} vs W${m.r32b}</div>` : '';
+
   return `<div class="mcard" style="${(userPick||winner!==undefined)?'border-color:#253040;':''}">
     <div class="mlabel"><span style="font-size:9px;color:var(--muted2)">${m.label}</span>${badge}</div>
     <div class="mteams">
@@ -2005,6 +2007,7 @@ function renderKOMatch(m){
         ${t2picked?'<span style="font-size:11px;color:var(--green);font-weight:700">✓</span>':''}
       </div>
     </div>
+    ${seedLabel}
     ${hint}
   </div>`;
 }
