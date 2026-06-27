@@ -1599,6 +1599,9 @@ function checkPerfectMatchdays(user){
 }
 
 function checkPerfectGroups(user){
+  // Only activate after ALL 72 group stage matches are complete
+  const allGroupsDone = GROUP_MATCHES.every(m => ST.results[m.id] !== undefined);
+  if(!allGroupsDone) return 0;
   // Returns count of groups where user predicted exact 1st/2nd/3rd/4th order correctly
   const predicted = computeStandings(user);
   const actual = computeStandings(null); // actual results only
@@ -1606,10 +1609,6 @@ function checkPerfectGroups(user){
   Object.keys(GROUPS).forEach(gk=>{
     const pred = predicted[gk].map(r=>r.team);
     const act = actual[gk].map(r=>r.team);
-    // Only check if all 6 matches in the group have results
-    const groupMatchIds = GROUP_MATCHES.filter(m=>m.group===gk).map(m=>m.id);
-    const allDone = groupMatchIds.every(id=>ST.results[id]!==undefined);
-    if(!allDone) return;
     if(pred[0]===act[0]&&pred[1]===act[1]&&pred[2]===act[2]&&pred[3]===act[3]) perfect++;
   });
   return perfect;
