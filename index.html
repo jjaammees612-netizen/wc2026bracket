@@ -1514,10 +1514,8 @@ function resolveKOTeams(user){
     };
   });
 
-  // Step 2: helper — returns winner only if actually picked/resulted, else null
+  // Step 2: helper — returns winner based on user's pick only (march madness style)
   function advancer(matchId){
-    const actual = res[matchId];
-    if(actual !== undefined) return actual.winner;
     return kp[matchId] || null; // null = not picked yet → propagates as TBD
   }
 
@@ -2003,12 +2001,12 @@ function renderKOMatch(m){
     <div class="mteams">
       <div class="trow" style="cursor:pointer;${t1style}" onclick="${t1click}">
         <div class="tname"><span class="tflag">${fl(m.t1)}</span>${m.t1}</div>
-        ${t1picked?'<span style="font-size:11px;color:var(--green);font-weight:700">✓</span>':''}
+        ${t1picked?`<span style="font-size:11px;color:${pickCorrect===false?'#ef4444':'var(--green)'};font-weight:700">${pickCorrect===false?'✗':'✓'}</span>`:''}
       </div>
       <div class="vsline">VS</div>
       <div class="trow" style="cursor:pointer;${t2style}" onclick="${t2click}">
         <div class="tname"><span class="tflag">${fl(m.t2)}</span>${m.t2}</div>
-        ${t2picked?'<span style="font-size:11px;color:var(--green);font-weight:700">✓</span>':''}
+        ${t2picked?`<span style="font-size:11px;color:${pickCorrect===false?'#ef4444':'var(--green)'};font-weight:700">${pickCorrect===false?'✗':'✓'}</span>`:''}
       </div>
     </div>
     ${seedLabel}
