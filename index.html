@@ -1979,16 +1979,21 @@ function renderKOMatch(m){
     </div>`;
   }
 
-  const t1picked = winner===m.t1 || userPick===m.t1;
-  const t2picked = winner===m.t2 || userPick===m.t2;
-  const t1style = t1picked ? 'background:rgba(16,185,129,.15);border-color:var(--green);' : t2picked ? 'opacity:.4;' : '';
-  const t2style = t2picked ? 'background:rgba(16,185,129,.15);border-color:var(--green);' : t1picked ? 'opacity:.4;' : '';
+  const t1picked = userPick===m.t1;
+  const t2picked = userPick===m.t2;
+  const pickCorrect = winner!==undefined && userPick ? userPick===winner : null;
+  const t1style = t1picked ? `background:rgba(${pickCorrect===null?'16,185,129':pickCorrect?'16,185,129':'239,68,68'},.15);border-color:var(${pickCorrect===null?'--green':pickCorrect?'--green':'--red, #ef4444'});` : t2picked ? 'opacity:.4;' : '';
+  const t2style = t2picked ? `background:rgba(${pickCorrect===null?'16,185,129':pickCorrect?'16,185,129':'239,68,68'},.15);border-color:var(${pickCorrect===null?'--green':pickCorrect?'--green':'--red, #ef4444'});` : t1picked ? 'opacity:.4;' : '';
 
   const t1click = winner!==undefined ? `setKOResult('${m.id}','${m.t1}','${m.t2}','w1')` : `koPick('${m.id}','${m.t1}')`;
   const t2click = winner!==undefined ? `setKOResult('${m.id}','${m.t1}','${m.t2}','w2')` : `koPick('${m.id}','${m.t2}')`;
 
+  const yourPickLine = (winner!==undefined && userPick)
+    ? `<div style="font-size:10px;text-align:center;margin-top:5px;color:${pickCorrect?'var(--green)':'#ef4444'}">Your pick: ${fl(userPick)} ${userPick} ${pickCorrect?'✓':'✗'}</div>`
+    : '';
+
   const hint = winner!==undefined
-    ? `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:6px">tap to change result</div>`
+    ? ''
     : !userPick ? `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:6px">tap team to pick</div>` : '';
 
   const seedLabel = m.seedT1 ? `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.3px">${m.seedT1} vs ${m.seedT2}</div>` : m.r32a ? `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.3px">W${m.r32a} vs W${m.r32b}</div>` : '';
@@ -2007,6 +2012,7 @@ function renderKOMatch(m){
       </div>
     </div>
     ${seedLabel}
+    ${yourPickLine}
     ${hint}
   </div>`;
 }
