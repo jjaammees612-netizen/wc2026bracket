@@ -2070,9 +2070,18 @@ function renderMyPicks(){
     if(!pick) return '';
     const res = ST.results[m.id];
     let badge='<span class="badge bup">Pending</span>';
-    if(res) badge = res.winner===pick?'<span class="badge bdone">✓ Correct</span>':'<span class="badge blive">✗ Wrong</span>';
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px;">
-      <div style="display:flex;gap:8px;align-items:center"><span style="color:var(--muted);font-size:11px">${m.id}</span><span>${fl(pick)} ${pick}</span></div>${badge}</div>`;
+    if(res) badge = res.winner===pick?'<span class="badge bdone">✓</span>':'<span class="badge blive">✗</span>';
+    const resolved = resolveKOTeams(id?.realName || activeFriend);
+    const t1 = resolved[m.id]?.t1 || '?';
+    const t2 = resolved[m.id]?.t2 || '?';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;">
+      <div style="display:flex;gap:8px;align-items:center;flex:1">
+        <span style="color:var(--muted);font-size:10px;min-width:28px">${m.id}</span>
+        <span style="color:var(--muted);font-size:10px">${fl(t1)}${t1} vs ${fl(t2)}${t2}</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-weight:600">${fl(pick)} ${pick}</span>${badge}
+      </div></div>`;
   }).filter(Boolean).join('');
 
   el.innerHTML = progress + (gpRows||kpRows ? `
