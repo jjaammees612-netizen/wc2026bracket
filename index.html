@@ -396,7 +396,7 @@ const supabase = {
 // ====================================================
 // TOURNAMENT DATA
 // ====================================================
-const LOCK_DATE = new Date('2026-06-11T19:00:00Z'); // Permanently locked - tournament started
+const LOCK_DATE = new Date('2026-06-27T23:59:00Z'); // Extended to Jun 27 for 3rd place ranking
 
 const GROUPS = {
   A:{name:'A',teams:['Mexico','South Africa','South Korea','Czech Republic']},
@@ -1514,8 +1514,10 @@ function resolveKOTeams(user){
     };
   });
 
-  // Step 2: helper — returns winner based on user's pick only (march madness style)
+  // Step 2: helper — returns winner only if actually picked/resulted, else null
   function advancer(matchId){
+    const actual = res[matchId];
+    if(actual !== undefined) return actual.winner;
     return kp[matchId] || null; // null = not picked yet → propagates as TBD
   }
 
@@ -1600,13 +1602,30 @@ function checkPerfectGroups(user){
   // Only activate after ALL 72 group stage matches are complete
   const allGroupsDone = GROUP_MATCHES.every(m => ST.results[m.id] !== undefined);
   if(!allGroupsDone) return 0;
-  // Returns count of groups where user predicted exact 1st/2nd/3rd/4th order correctly
+
+  // Compute ACTUAL standings from real results
+  const actualStandings = {};
+  for(const gk of Object.keys(GROUPS)){
+    const teams = GROUPS[gk].teams;
+    const table = {};
+    teams.forEach(t=>{table[t]={team:t,pts:0,w:0,d:0,l:0};});
+    GROUP_MATCHES.filter(m=>m.group===gk).forEach(m=>{
+      const res = ST.results[m.id];
+      if(!res) return;
+      const {winner} = res;
+      if(winner==='w1'){table[m.t1].pts+=3;table[m.t1].w++;table[m.t2].l++;}
+      else if(winner==='w2'){table[m.t2].pts+=3;table[m.t2].w++;table[m.t1].l++;}
+      else{table[m.t1].pts+=1;table[m.t1].d++;table[m.t2].pts+=1;table[m.t2].d++;}
+    });
+    actualStandings[gk] = Object.values(table).sort((a,b)=>b.pts-a.pts||b.w-a.w||a.team.localeCompare(b.team));
+  }
+
+  // Compare user's predicted standings to actual
   const predicted = computeStandings(user);
-  const actual = computeStandings(null); // actual results only
   let perfect = 0;
   Object.keys(GROUPS).forEach(gk=>{
     const pred = predicted[gk].map(r=>r.team);
-    const act = actual[gk].map(r=>r.team);
+    const act = actualStandings[gk].map(r=>r.team);
     if(pred[0]===act[0]&&pred[1]===act[1]&&pred[2]===act[2]&&pred[3]===act[3]) perfect++;
   });
   return perfect;
@@ -1977,26 +1996,16 @@ function renderKOMatch(m){
     </div>`;
   }
 
-  const t1picked = userPick===m.t1;
-  const t2picked = userPick===m.t2;
-  const pickCorrect = winner!==undefined && userPick ? userPick===winner : null;
-  const t1style = t1picked ? `background:rgba(${pickCorrect===null?'16,185,129':pickCorrect?'16,185,129':'239,68,68'},.15);border-color:var(${pickCorrect===null?'--green':pickCorrect?'--green':'--red, #ef4444'});` : t2picked ? 'opacity:.4;' : '';
-  const t2style = t2picked ? `background:rgba(${pickCorrect===null?'16,185,129':pickCorrect?'16,185,129':'239,68,68'},.15);border-color:var(${pickCorrect===null?'--green':pickCorrect?'--green':'--red, #ef4444'});` : t1picked ? 'opacity:.4;' : '';
+  const t1picked = winner===m.t1 || userPick===m.t1;
+  const t2picked = winner===m.t2 || userPick===m.t2;
+  const t1style = t1picked ? 'background:rgba(16,185,129,.15);border-color:var(--green);' : t2picked ? 'opacity:.4;' : '';
+  const t2style = t2picked ? 'background:rgba(16,185,129,.15);border-color:var(--green);' : t1picked ? 'opacity:.4;' : '';
 
-  const locked = isLocked();
-  const t1click = winner===undefined && !locked ? `koPick('${m.id}','${m.t1}')` : '';
-  const t2click = winner===undefined && !locked ? `koPick('${m.id}','${m.t2}')` : '';
-  const cursorStyle = (winner!==undefined || locked) ? 'default' : 'pointer';
-
-  const yourPickLine = (winner!==undefined && userPick)
-    ? `<div style="font-size:10px;text-align:center;margin-top:5px;color:${pickCorrect?'var(--green)':'#ef4444'}">
-        Your pick: ${fl(userPick)} ${userPick} ${pickCorrect?'✓':'✗'}
-        ${!pickCorrect?`<span style="color:var(--muted)"> · Actual: ${fl(winner)} ${winner}</span>`:''}
-       </div>`
-    : '';
+  const t1click = winner!==undefined ? `setKOResult('${m.id}','${m.t1}','${m.t2}','w1')` : `koPick('${m.id}','${m.t1}')`;
+  const t2click = winner!==undefined ? `setKOResult('${m.id}','${m.t1}','${m.t2}','w2')` : `koPick('${m.id}','${m.t2}')`;
 
   const hint = winner!==undefined
-    ? ''
+    ? `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:6px">tap to change result</div>`
     : !userPick ? `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:6px">tap team to pick</div>` : '';
 
   const seedLabel = m.seedT1 ? `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.3px">${m.seedT1} vs ${m.seedT2}</div>` : m.r32a ? `<div style="font-size:9px;color:var(--muted);text-align:center;margin-top:3px;letter-spacing:.3px">W${m.r32a} vs W${m.r32b}</div>` : '';
@@ -2004,25 +2013,23 @@ function renderKOMatch(m){
   return `<div class="mcard" style="${(userPick||winner!==undefined)?'border-color:#253040;':''}">
     <div class="mlabel"><span style="font-size:9px;color:var(--muted2)">${m.label}</span>${badge}</div>
     <div class="mteams">
-      <div class="trow" style="cursor:${cursorStyle};${t1style}" onclick="${t1click}">
+      <div class="trow" style="cursor:pointer;${t1style}" onclick="${t1click}">
         <div class="tname"><span class="tflag">${fl(m.t1)}</span>${m.t1}</div>
-        ${t1picked?`<span style="font-size:11px;color:${pickCorrect===false?'#ef4444':'var(--green)'};font-weight:700">${pickCorrect===false?'✗':'✓'}</span>`:''}
+        ${t1picked?'<span style="font-size:11px;color:var(--green);font-weight:700">✓</span>':''}
       </div>
       <div class="vsline">VS</div>
-      <div class="trow" style="cursor:${cursorStyle};${t2style}" onclick="${t2click}">
+      <div class="trow" style="cursor:pointer;${t2style}" onclick="${t2click}">
         <div class="tname"><span class="tflag">${fl(m.t2)}</span>${m.t2}</div>
-        ${t2picked?`<span style="font-size:11px;color:${pickCorrect===false?'#ef4444':'var(--green)'};font-weight:700">${pickCorrect===false?'✗':'✓'}</span>`:''}
+        ${t2picked?'<span style="font-size:11px;color:var(--green);font-weight:700">✓</span>':''}
       </div>
     </div>
     ${seedLabel}
-    ${yourPickLine}
     ${hint}
   </div>`;
 }
 
 function koPick(matchId, team){
   if(!ME){showToast('Select your name first ☝️');return;}
-  if(isLocked()){showToast('🔒 Picks are locked!');return;}
   if(ME.koPicks[matchId]===team){
     delete ME.koPicks[matchId];showToast('Pick removed');
   } else {
@@ -2080,18 +2087,9 @@ function renderMyPicks(){
     if(!pick) return '';
     const res = ST.results[m.id];
     let badge='<span class="badge bup">Pending</span>';
-    if(res) badge = res.winner===pick?'<span class="badge bdone">✓</span>':'<span class="badge blive">✗</span>';
-    const resolved = resolveKOTeams(id?.realName || activeFriend);
-    const t1 = resolved[m.id]?.t1 || '?';
-    const t2 = resolved[m.id]?.t2 || '?';
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;">
-      <div style="display:flex;gap:8px;align-items:center;flex:1">
-        <span style="color:var(--muted);font-size:10px;min-width:28px">${m.id}</span>
-        <span style="color:var(--muted);font-size:10px">${fl(t1)}${t1} vs ${fl(t2)}${t2}</span>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <span style="font-weight:600">${fl(pick)} ${pick}</span>${badge}
-      </div></div>`;
+    if(res) badge = res.winner===pick?'<span class="badge bdone">✓ Correct</span>':'<span class="badge blive">✗ Wrong</span>';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px;">
+      <div style="display:flex;gap:8px;align-items:center"><span style="color:var(--muted);font-size:11px">${m.id}</span><span>${fl(pick)} ${pick}</span></div>${badge}</div>`;
   }).filter(Boolean).join('');
 
   el.innerHTML = progress + (gpRows||kpRows ? `
